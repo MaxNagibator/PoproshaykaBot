@@ -116,16 +116,26 @@ public class Bot : IAsyncDisposable
         {
             if (string.IsNullOrWhiteSpace(_channel) == false)
             {
+                var messages = new List<string>();
+
                 if (_settings.Messages.FarewellEnabled
                     && string.IsNullOrWhiteSpace(_settings.Messages.Farewell) == false)
                 {
-                    await SendPersonalFarewellMessages(_channel, _settings.Messages.Farewell);
+                    var userNames = string.Join(", ", _seenUsers.Values.Select(u => u.DisplayName));
+                    var farewellMessage = _settings.Messages.Farewell.Replace("{username}", userNames);
+                    messages.Add(farewellMessage);
                 }
 
                 if (_settings.Messages.DisconnectionEnabled
                     && string.IsNullOrWhiteSpace(_settings.Messages.Disconnection) == false)
                 {
-                    _client.SendMessage(_channel, _settings.Messages.Disconnection);
+                    messages.Add(_settings.Messages.Disconnection);
+                }
+
+                if (messages.Count > 0)
+                {
+                    var combinedMessage = string.Join(" ", messages);
+                    _client.SendMessage(_channel, combinedMessage);
                 }
             }
 
@@ -340,6 +350,33 @@ public class Bot : IAsyncDisposable
                     break;
                 }
 
+            case "!пользователи":
+            case "!чат":
+                if (_seenUsers.Count == 0)
+                {
+                    botResponse = "В чате пока нет активных пользователей";
+                    _client.SendMessage(e.ChatMessage.Channel, botResponse);
+                    break;
+                }
+
+                var userNames = _seenUsers.Values.Select(x => x.DisplayName).ToList();
+                var userCount = userNames.Count;
+
+                if (userCount <= 10)
+                {
+                    var userList = string.Join(", ", userNames);
+                    botResponse = $"👥 Активные пользователи чата ({userCount}): {userList}";
+                }
+                else
+                {
+                    var firstUsers = userNames.Take(8).ToList();
+                    var userList = string.Join(", ", firstUsers);
+                    botResponse = $"👥 Активные пользователи чата ({userCount}): {userList} и ещё {userCount - 8}";
+                }
+
+                _client.SendMessage(e.ChatMessage.Channel, botResponse);
+                break;
+
             case "!пока":
                 botResponse = _settings.Messages.Farewell.Replace("{username}", e.ChatMessage.DisplayName);
                 _client.SendMessage(e.ChatMessage.Channel, botResponse);
@@ -419,17 +456,7 @@ public class Bot : IAsyncDisposable
         return moscowTime.ToString("dd.MM.yyyy HH:mm", CultureInfo.GetCultureInfo("ru-RU")) + " по МСК";
     }
 
-    private async Task SendPersonalFarewellMessages(string channel, string farewellMessage)
-    {
-        foreach (var user in _seenUsers.Values)
-        {
-            var personalMessage = farewellMessage.Replace("{username}", user.DisplayName);
-            _client.SendMessage(channel, personalMessage);
 
-            // TODO: Подумать
-            await Task.Delay(100);
-        }
-    }
 }
 
 public record UserInfo(string UserId, string DisplayName);
