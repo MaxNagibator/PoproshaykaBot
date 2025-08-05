@@ -1,3 +1,4 @@
+using PoproshaykaBot.WinForms.Settings;
 using System.Diagnostics;
 using System.Net;
 using System.Text;
@@ -10,7 +11,7 @@ public static class TwitchOAuthService
 {
     public static event Action<string>? StatusChanged;
 
-    public static async Task<string> StartOAuthFlowAsync(string clientId, string clientSecret, string[]? scopes = null, string? redirectUri = null)
+    public static async Task<string> StartOAuthFlowAsync(string clientId, string clientSecret, UnifiedHttpServer? httpServer = null, string[]? scopes = null, string? redirectUri = null)
     {
         if (string.IsNullOrWhiteSpace(clientId))
         {
@@ -36,7 +37,17 @@ public static class TwitchOAuthService
                       + $"&redirect_uri={Uri.EscapeDataString(redirectUri)}"
                       + $"&scope={Uri.EscapeDataString(scopeString)}";
 
-        var codeTask = StartLocalHttpServerAsync(redirectUri);
+        Task<string> codeTask;
+
+        if (httpServer != null)
+        {
+            codeTask = httpServer.WaitForOAuthCodeAsync();
+        }
+        else
+        {
+            // TODO: Для обратной совместимости
+            codeTask = StartLocalHttpServerAsync(redirectUri);
+        }
 
         try
         {

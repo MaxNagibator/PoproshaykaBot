@@ -1,4 +1,5 @@
 ﻿using PoproshaykaBot.WinForms.Models;
+using PoproshaykaBot.WinForms.Settings;
 
 namespace PoproshaykaBot.WinForms;
 
@@ -9,6 +10,7 @@ public partial class MainForm : Form
     private bool _isConnected;
     private BotConnectionManager? _connectionManager;
     private ChatWindow? _chatWindow;
+    private UnifiedHttpServer? _httpServer;
 
     public MainForm()
     {
@@ -19,6 +21,7 @@ public partial class MainForm : Form
         LoadSettings();
         UpdateBroadcastButtonState();
         InitializePanelVisibility();
+        InitializeHttpServer();
 
         _chatHistoryManager.RegisterChatDisplay(_chatDisplay);
 
@@ -65,6 +68,26 @@ public partial class MainForm : Form
         }
 
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    protected override async void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (_httpServer != null)
+        {
+            try
+            {
+                SettingsManager.ChatSettingsChanged -= _httpServer.NotifyChatSettingsChanged;
+
+                await _httpServer.StopAsync();
+                _httpServer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                AddLogMessage($"Ошибка остановки HTTP сервера: {ex.Message}");
+            }
+        }
+
+        base.OnFormClosing(e);
     }
 
     private async void OnConnectButtonClicked(object sender, EventArgs e)
@@ -258,6 +281,17 @@ public partial class MainForm : Form
 
         LoadSettings();
         AddLogMessage("Настройки обновлены.");
+    }
+
+    private void OnHttpServerLogMessage(string message)
+    {
+        if (InvokeRequired)
+        {
+            Invoke(new Action<string>(OnHttpServerLogMessage), message);
+            return;
+        }
+
+        AddLogMessage($"HTTP: {message}");
     }
 
     private static Bot CreateBotWithSettings(string accessToken)
@@ -529,6 +563,7 @@ public partial class MainForm : Form
         {
             var oauthTask = TwitchOAuthService.StartOAuthFlowAsync(settings.ClientId,
                 settings.ClientSecret,
+                _httpServer,
                 settings.Scopes,
                 settings.RedirectUri);
 
@@ -539,6 +574,44 @@ public partial class MainForm : Form
         finally
         {
             TwitchOAuthService.StatusChanged -= OnOAuthStatusChanged;
+        }
+    }
+
+    private async void InitializeHttpServer()
+    {
+        var settings = SettingsManager.Current.Twitch;
+
+        if (settings.HttpServerEnabled == false)
+        {
+            AddLogMessage("HTTP сервер отключен в настройках.");
+            return;
+        }
+
+        try
+        {
+            if (PortValidator.ValidateAndResolvePortConflictAsync(SettingsManager.Current) == false)
+            {
+                AddLogMessage("Не удалось разрешить конфликт портов. HTTP сервер не запущен.");
+                return;
+            }
+
+            _httpServer = new(_chatHistoryManager, settings.HttpServerPort);
+            _httpServer.LogMessage += OnHttpServerLogMessage;
+
+            SettingsManager.ChatSettingsChanged += _httpServer.NotifyChatSettingsChanged;
+
+            await _httpServer.StartAsync();
+
+            AddLogMessage($"HTTP сервер запущен на порту {settings.HttpServerPort}");
+
+            if (settings.ObsOverlayEnabled)
+            {
+                AddLogMessage($"OBS overlay доступен по адресу: http://localhost:{settings.HttpServerPort}/chat");
+            }
+        }
+        catch (Exception ex)
+        {
+            AddLogMessage($"Ошибка запуска HTTP сервера: {ex.Message}");
         }
     }
 }
