@@ -103,7 +103,7 @@ public sealed class SseService(SettingsManager settingsManager) : IChatDisplay, 
                 message = DtoMapper.ToServerMessage(chatMessage),
             };
 
-            var json = JsonSerializer.Serialize(messageData);
+            var json = JsonSerializer.Serialize(messageData, JsonSerializerOptions);
             SendSseToAllClients(json);
         }
         catch (Exception ex)
@@ -140,16 +140,18 @@ public sealed class SseService(SettingsManager settingsManager) : IChatDisplay, 
 
             var json = JsonSerializer.Serialize(sseMessage, JsonSerializerOptions);
 
+            int clientCount;
             lock (_sseClients)
             {
-                if (_sseClients.Count == 0)
+                clientCount = _sseClients.Count;
+                if (clientCount == 0)
                 {
                     return;
                 }
             }
 
             SendSseToAllClients(json);
-            LogMessage?.Invoke($"Отправлено уведомление об изменении настроек чата {_sseClients.Count} клиентам");
+            LogMessage?.Invoke($"Отправлено уведомление об изменении настроек чата {clientCount} клиентам");
         }
         catch (Exception ex)
         {

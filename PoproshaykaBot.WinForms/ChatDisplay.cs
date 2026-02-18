@@ -4,6 +4,8 @@ namespace PoproshaykaBot.WinForms;
 
 public partial class ChatDisplay : UserControl, IChatDisplay
 {
+    private const int MaxChatLines = 200;
+
     public ChatDisplay()
     {
         InitializeComponent();
@@ -15,6 +17,16 @@ public partial class ChatDisplay : UserControl, IChatDisplay
         {
             Invoke(new Action<ChatMessageData>(AddChatMessage), chatMessage);
             return;
+        }
+
+        if (_chatRichTextBox.Lines.Length > MaxChatLines)
+        {
+            int charIndex = _chatRichTextBox.GetFirstCharIndexFromLine(_chatRichTextBox.Lines.Length - MaxChatLines);
+            if (charIndex > 0)
+            {
+                _chatRichTextBox.Select(0, charIndex);
+                _chatRichTextBox.SelectedText = "";
+            }
         }
 
         var shouldAutoScroll = _chatRichTextBox.SelectionStart >= _chatRichTextBox.Text.Length - 1;

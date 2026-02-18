@@ -6,6 +6,7 @@ namespace PoproshaykaBot.WinForms;
 
 public partial class MainForm : Form
 {
+    private const int MaxLogLines = 500;
     private readonly ChatHistoryManager _chatHistoryManager;
     private readonly SettingsManager _settingsManager;
     private readonly BotConnectionManager _connectionManager;
@@ -539,6 +540,16 @@ public partial class MainForm : Form
         {
             Invoke(new Action<string>(AddLogMessage), message);
             return;
+        }
+
+        if (_logTextBox.Lines.Length > MaxLogLines)
+        {
+            int charIndex = _logTextBox.GetFirstCharIndexFromLine(_logTextBox.Lines.Length - MaxLogLines);
+            if (charIndex > 0)
+            {
+                _logTextBox.Select(0, charIndex);
+                _logTextBox.SelectedText = "";
+            }
         }
 
         _logTextBox.AppendText($"{DateTime.Now:HH:mm:ss} - {message}{Environment.NewLine}");

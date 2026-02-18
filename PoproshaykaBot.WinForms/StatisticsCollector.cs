@@ -23,6 +23,7 @@ public class StatisticsCollector : IAsyncDisposable
     private readonly string _botStatisticsFilePath;
     private readonly Timer _autoSaveTimer;
     private readonly Dictionary<string, UserStatistics> _userStatistics;
+    private readonly object _userStatisticsLock = new();
     private BotStatistics _botStatistics;
     private bool _hasChanges;
     private bool _disposed;
@@ -82,7 +83,7 @@ public class StatisticsCollector : IAsyncDisposable
     {
         if (string.IsNullOrWhiteSpace(userId))
         {
-            throw new ArgumentException("ID пользователя не может быть null или пустым.", nameof(userId));
+            throw new ArgumentException("ИД пользователя не может быть null или пустым.", nameof(userId));
         }
 
         if (string.IsNullOrWhiteSpace(username))
@@ -90,18 +91,21 @@ public class StatisticsCollector : IAsyncDisposable
             throw new ArgumentException("Имя пользователя не может быть null или пустым.", nameof(username));
         }
 
-        if (_userStatistics.TryGetValue(userId, out var statistic))
+        lock (_userStatisticsLock)
         {
-            statistic.UpdateName(username);
-        }
-        else
-        {
-            _userStatistics[userId] = UserStatistics.Create(userId, username);
+            if (_userStatistics.TryGetValue(userId, out var statistic))
+            {
+                statistic.UpdateName(username);
+            }
+            else
+            {
+                _userStatistics[userId] = UserStatistics.Create(userId, username);
+            }
+
+            _userStatistics[userId].IncrementMessageCount();
         }
 
-        _userStatistics[userId].IncrementMessageCount();
         _botStatistics.IncrementMessagesProcessed();
-
         MarkAsChanged();
     }
 
@@ -112,8 +116,11 @@ public class StatisticsCollector : IAsyncDisposable
             return null;
         }
 
-        _userStatistics.TryGetValue(userId, out var userStats);
-        return userStats;
+        lock (_userStatisticsLock)
+        {
+            _userStatistics.TryGetValue(userId, out var userStats);
+            return userStats;
+        }
     }
 
     public UserStatistics? GetUserStatisticsByName(string username)
@@ -125,8 +132,11 @@ public class StatisticsCollector : IAsyncDisposable
 
         var target = username.TrimStart('@');
 
-        return _userStatistics.Values
-            .FirstOrDefault(x => string.Equals(x.Name, target, StringComparison.OrdinalIgnoreCase));
+        lock (_userStatisticsLock)
+        {
+            return _userStatistics.Values
+                .FirstOrDefault(x => string.Equals(x.Name, target, StringComparison.OrdinalIgnoreCase));
+        }
     }
 
     public BotStatistics GetBotStatistics()
@@ -137,17 +147,21 @@ public class StatisticsCollector : IAsyncDisposable
 
     public List<UserStatistics> GetTopUsers(int count = 10)
     {
-        var topUsers = _userStatistics.Values
-            .OrderByDescending(x => x.TotalMessageCount)
-            .Take(count)
-            .ToList();
-
-        return topUsers;
+        lock (_userStatisticsLock)
+        {
+            return _userStatistics.Values
+                .OrderByDescending(x => x.TotalMessageCount)
+                .Take(count)
+                .ToList();
+        }
     }
 
     public List<UserStatistics> GetAllUsers()
     {
-        return _userStatistics.Values.ToList();
+        lock (_userStatisticsLock)
+        {
+            return _userStatistics.Values.ToList();
+        }
     }
 
     public bool IncrementUserMessages(string userId, ulong delta)
@@ -188,14 +202,19 @@ public class StatisticsCollector : IAsyncDisposable
         try
         {
             var userStats = await LoadUserStatisticsAsync();
-            _userStatistics.Clear();
+            var botStats = await LoadBotStatisticsAsync();
 
-            foreach (var (id, userStatistic) in userStats)
+            lock (_userStatisticsLock)
             {
-                _userStatistics[id] = userStatistic;
+                _userStatistics.Clear();
+
+                foreach (var (id, userStatistic) in userStats)
+                {
+                    _userStatistics[id] = userStatistic;
+                }
             }
 
-            _botStatistics = await LoadBotStatisticsAsync();
+            _botStatistics = botStats;
             _hasChanges = false;
         }
         catch (Exception exception)
@@ -230,7 +249,6 @@ public class StatisticsCollector : IAsyncDisposable
         }
     }
 
-    // TODO: Канкаренси
     private bool UpdateUserMessages(string userId, ulong delta, Action<UserStatistics, ulong> updateAction)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -243,13 +261,16 @@ public class StatisticsCollector : IAsyncDisposable
             return false;
         }
 
-        if (!_userStatistics.TryGetValue(userId, out var stats))
+        lock (_userStatisticsLock)
         {
-            return false;
-        }
+            if (!_userStatistics.TryGetValue(userId, out var stats))
+            {
+                return false;
+            }
 
-        updateAction(stats, delta);
-        stats.LastSeen = DateTime.UtcNow;
+            updateAction(stats, delta);
+            stats.LastSeen = DateTime.UtcNow;
+        }
 
         MarkAsChanged();
         return true;
@@ -262,9 +283,15 @@ public class StatisticsCollector : IAsyncDisposable
             return;
         }
 
+        List<UserStatistics> snapshot;
+        lock (_userStatisticsLock)
+        {
+            snapshot = _userStatistics.Values.ToList();
+        }
+
         try
         {
-            await SaveUserStatisticsAsync(_userStatistics);
+            await SaveUserStatisticsAsync(snapshot);
             await SaveBotStatisticsAsync(_botStatistics);
             _hasChanges = false;
         }
@@ -301,7 +328,7 @@ public class StatisticsCollector : IAsyncDisposable
         }
     }
 
-    private async Task SaveUserStatisticsAsync(Dictionary<string, UserStatistics> userStatistics)
+    private async Task SaveUserStatisticsAsync(List<UserStatistics> userStatistics)
     {
         try
         {
@@ -309,7 +336,7 @@ public class StatisticsCollector : IAsyncDisposable
 
             await Task.Run(() =>
             {
-                var userStatisticsList = userStatistics.Values.ToList();
+                var userStatisticsList = userStatistics;
                 var json = JsonSerializer.Serialize(userStatisticsList, JsonOptions);
 
                 var tempFilePath = _userStatisticsFilePath + ".tmp";
