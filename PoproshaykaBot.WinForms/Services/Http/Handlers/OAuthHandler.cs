@@ -13,11 +13,12 @@ public sealed class OAuthHandler(TwitchOAuthService twitchOAuthService) : IHttpH
         try
         {
             var code = request.QueryString["code"];
+            var state = request.QueryString["state"];
             var error = request.QueryString["error"];
 
             if (!string.IsNullOrEmpty(code))
             {
-                twitchOAuthService.SetAuthResult(code);
+                twitchOAuthService.SetAuthResult(code, state);
 
                 var successHtml =
                     """

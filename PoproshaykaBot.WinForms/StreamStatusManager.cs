@@ -1,4 +1,5 @@
 using PoproshaykaBot.WinForms.Models;
+using PoproshaykaBot.WinForms.Settings;
 using TwitchLib.Api;
 using TwitchLib.Api.Core.Enums;
 using TwitchLib.EventSub.Websockets;
@@ -12,6 +13,8 @@ public class StreamStatusManager : IAsyncDisposable
     private const int MaxReconnectAttempts = 5;
     private readonly EventSubWebsocketClient _eventSubClient;
     private readonly TwitchAPI _twitchApi;
+    private readonly SettingsManager _settingsManager;
+    private readonly TwitchOAuthService _oauthService;
     private string? _broadcasterUserId;
     private bool _disposed;
     private bool _isInitialized;
@@ -19,10 +22,16 @@ public class StreamStatusManager : IAsyncDisposable
     private bool _stopRequested;
     private CancellationTokenSource? _reconnectCts;
 
-    public StreamStatusManager(EventSubWebsocketClient eventSubClient, TwitchAPI twitchApi)
+    public StreamStatusManager(
+        EventSubWebsocketClient eventSubClient,
+        TwitchAPI twitchApi,
+        SettingsManager settingsManager,
+        TwitchOAuthService oauthService)
     {
         _eventSubClient = eventSubClient;
         _twitchApi = twitchApi;
+        _settingsManager = settingsManager;
+        _oauthService = oauthService;
 
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
         _eventSubClient.WebsocketDisconnected += OnWebsocketDisconnected;
@@ -35,8 +44,8 @@ public class StreamStatusManager : IAsyncDisposable
 
     public event Action<string>? ErrorOccurred;
     public event Action<string>? MonitoringLogMessage;
-    public event Action<StreamStatus>? StreamStatusChanged;
     public event Action<StreamOnlineArgs>? StreamStarted;
+    public event Action<StreamStatus>? StreamStatusChanged;
     public event Action<StreamOfflineArgs>? StreamStopped;
 
     public StreamStatus CurrentStatus { get; private set; } = StreamStatus.Unknown;
@@ -68,14 +77,14 @@ public class StreamStatusManager : IAsyncDisposable
 
     public async Task StartMonitoringAsync(string channelName)
     {
-        if (_isInitialized == false)
-        {
-            throw new InvalidOperationException("StreamStatusManager не инициализирован. Вызовите InitializeAsync сначала.");
-        }
-
         if (string.IsNullOrWhiteSpace(channelName))
         {
             ErrorOccurred?.Invoke("Имя канала не может быть пустым");
+            return;
+        }
+
+        if (!await EnsureAuthenticatedAsync())
+        {
             return;
         }
 
@@ -98,7 +107,7 @@ public class StreamStatusManager : IAsyncDisposable
 
             var connected = await _eventSubClient.ConnectAsync();
 
-            if (connected == false)
+            if (!connected)
             {
                 var errorMessage = "Не удалось подключиться к EventSub WebSocket";
                 ErrorOccurred?.Invoke(errorMessage);
@@ -174,12 +183,76 @@ public class StreamStatusManager : IAsyncDisposable
         GC.SuppressFinalize(this);
     }
 
+    public async Task RefreshCurrentStatusAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_broadcasterUserId))
+            {
+                return;
+            }
+
+            if (!await EnsureAuthenticatedAsync())
+            {
+                return;
+            }
+
+            var response = await _twitchApi.Helix.Streams.GetStreamsAsync(userIds: [_broadcasterUserId]);
+            var isOnline = response?.Streams != null && response.Streams.Length > 0;
+            var newStatus = isOnline ? StreamStatus.Online : StreamStatus.Offline;
+
+            if (CurrentStatus == StreamStatus.Online && newStatus == StreamStatus.Offline)
+            {
+                // API тормозит
+            }
+            else if (CurrentStatus != newStatus)
+            {
+                CurrentStatus = newStatus;
+                StreamStatusChanged?.Invoke(CurrentStatus);
+            }
+
+            if (isOnline)
+            {
+                var stream = response!.Streams[0];
+
+                CurrentStream = new()
+                {
+                    Id = stream.Id,
+                    UserId = stream.UserId,
+                    UserLogin = stream.UserLogin,
+                    UserName = stream.UserName,
+                    GameId = stream.GameId,
+                    GameName = stream.GameName,
+                    Title = stream.Title,
+                    Language = stream.Language,
+                    ViewerCount = stream.ViewerCount,
+                    StartedAt = stream.StartedAt,
+                    ThumbnailUrl = stream.ThumbnailUrl,
+                    Tags = stream.Tags ?? [],
+                    IsMature = stream.IsMature,
+                };
+            }
+            else
+            {
+                CurrentStream = null;
+            }
+
+            MonitoringLogMessage?.Invoke(isOnline
+                ? "Текущий статус: онлайн (по данным API)"
+                : "Текущий статус: офлайн (по данным API)");
+        }
+        catch (Exception exception)
+        {
+            ErrorOccurred?.Invoke($"Ошибка получения текущего статуса стрима: {exception.Message}");
+        }
+    }
+
     private async Task OnWebsocketConnected(object sender, WebsocketConnectedArgs e)
     {
         _reconnectAttempts = 0;
         MonitoringLogMessage?.Invoke($"EventSub WebSocket подключен (Session: {_eventSubClient.SessionId})");
 
-        if (e.IsRequestedReconnect == false && string.IsNullOrEmpty(_broadcasterUserId) == false)
+        if (!e.IsRequestedReconnect && !string.IsNullOrEmpty(_broadcasterUserId))
         {
             await CreateEventSubSubscriptions();
         }
@@ -242,7 +315,7 @@ public class StreamStatusManager : IAsyncDisposable
 
     private Task OnWebsocketReconnected(object sender, EventArgs e)
     {
-        if (_stopRequested == false)
+        if (!_stopRequested)
         {
             MonitoringLogMessage?.Invoke($"EventSub WebSocket переподключен (Session: {_eventSubClient.SessionId})");
         }
@@ -309,6 +382,28 @@ public class StreamStatusManager : IAsyncDisposable
         return Task.CompletedTask;
     }
 
+    private async Task<bool> EnsureAuthenticatedAsync()
+    {
+        var settings = _settingsManager.Current.Twitch;
+
+        if (string.IsNullOrEmpty(settings.ClientId))
+        {
+            ErrorOccurred?.Invoke("Client ID не настроен в настройках.");
+            return false;
+        }
+
+        var token = await _oauthService.GetValidTokenOrRefreshAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            ErrorOccurred?.Invoke("Токен доступа отсутствует или недействителен. Пожалуйста, авторизуйтесь в настройках.");
+            return false;
+        }
+
+        _twitchApi.Settings.ClientId = settings.ClientId;
+        _twitchApi.Settings.AccessToken = token;
+        return true;
+    }
+
     private async Task<string?> GetBroadcasterUserIdAsync(string channelName)
     {
         if (string.IsNullOrEmpty(channelName))
@@ -317,9 +412,8 @@ public class StreamStatusManager : IAsyncDisposable
             return null;
         }
 
-        if (string.IsNullOrEmpty(_twitchApi.Settings.ClientId) || string.IsNullOrEmpty(_twitchApi.Settings.AccessToken))
+        if (!await EnsureAuthenticatedAsync())
         {
-            ErrorOccurred?.Invoke("TwitchAPI не настроен. Убедитесь, что ClientId и AccessToken установлены.");
             return null;
         }
 
@@ -346,68 +440,14 @@ public class StreamStatusManager : IAsyncDisposable
         }
     }
 
-    public async Task RefreshCurrentStatusAsync()
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(_broadcasterUserId))
-            {
-                return;
-            }
-
-            var response = await _twitchApi.Helix.Streams.GetStreamsAsync(userIds: [_broadcasterUserId]);
-            var isOnline = response?.Streams != null && response.Streams.Length > 0;
-            var newStatus = isOnline ? StreamStatus.Online : StreamStatus.Offline;
-
-            if (CurrentStatus == StreamStatus.Online && newStatus == StreamStatus.Offline)
-            {
-                // API тормозит
-            }
-            else if (CurrentStatus != newStatus)
-            {
-                CurrentStatus = newStatus;
-                StreamStatusChanged?.Invoke(CurrentStatus);
-            }
-
-            if (isOnline)
-            {
-                var stream = response!.Streams[0];
-
-                CurrentStream = new()
-                {
-                    Id = stream.Id,
-                    UserId = stream.UserId,
-                    UserLogin = stream.UserLogin,
-                    UserName = stream.UserName,
-                    GameId = stream.GameId,
-                    GameName = stream.GameName,
-                    Title = stream.Title,
-                    Language = stream.Language,
-                    ViewerCount = stream.ViewerCount,
-                    StartedAt = stream.StartedAt,
-                    ThumbnailUrl = stream.ThumbnailUrl,
-                    Tags = stream.Tags ?? [],
-                    IsMature = stream.IsMature,
-                };
-            }
-            else
-            {
-                CurrentStream = null;
-            }
-
-            MonitoringLogMessage?.Invoke(isOnline
-                ? "Текущий статус: онлайн (по данным API)"
-                : "Текущий статус: офлайн (по данным API)");
-        }
-        catch (Exception exception)
-        {
-            ErrorOccurred?.Invoke($"Ошибка получения текущего статуса стрима: {exception.Message}");
-        }
-    }
-
     private async Task CreateEventSubSubscriptions()
     {
         if (string.IsNullOrEmpty(_broadcasterUserId))
+        {
+            return;
+        }
+
+        if (!await EnsureAuthenticatedAsync())
         {
             return;
         }

@@ -126,7 +126,7 @@ public partial class OAuthSettingsControl : UserControl
                 redirectUri = DefaultSettings.RedirectUri;
             }
 
-            var accessToken = await _oauthService.StartOAuthFlowAsync(clientId, clientSecret, scopes, redirectUri);
+            var accessToken = await _oauthService.StartOAuthFlowAsync(clientId, clientSecret, scopes, redirectUri, CancellationToken.None);
 
             if (!string.IsNullOrEmpty(accessToken))
             {
@@ -238,12 +238,7 @@ public partial class OAuthSettingsControl : UserControl
 
         try
         {
-            var tokenResponse = await _oauthService.RefreshTokenAsync(clientId, clientSecret, refreshToken);
-
-            _settings.Twitch.AccessToken = tokenResponse.AccessToken;
-            _settings.Twitch.RefreshToken = tokenResponse.RefreshToken;
-
-            _settingsManager?.SaveSettings(_settings);
+            await _oauthService.RefreshTokenAsync(clientId, clientSecret, refreshToken);
 
             LoadTokenInformation();
             _tokenStatusValueLabel.Text = "Обновлен успешно";

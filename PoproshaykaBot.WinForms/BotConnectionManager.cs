@@ -46,8 +46,7 @@ public sealed class BotConnectionManager(Func<string, Bot> botFactory, TwitchOAu
         {
             ReportProgress("Получение токена доступа...");
 
-            // TODO: Добавить CT в TokenService
-            var accessToken = await tokenService.GetAccessTokenAsync();
+            var accessToken = await tokenService.GetAccessTokenAsync(ct);
 
             ct.ThrowIfCancellationRequested();
 
