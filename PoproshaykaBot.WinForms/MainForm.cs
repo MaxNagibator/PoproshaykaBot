@@ -1,4 +1,5 @@
-﻿using PoproshaykaBot.WinForms.Models;
+﻿using PoproshaykaBot.WinForms.Broadcast;
+using PoproshaykaBot.WinForms.Models;
 using PoproshaykaBot.WinForms.Settings;
 
 namespace PoproshaykaBot.WinForms;
@@ -12,6 +13,9 @@ public partial class MainForm : Form
     private readonly TwitchOAuthService _oauthService;
     private readonly StatisticsCollector _statisticsCollector;
     private readonly UserRankService _userRankService;
+    private readonly StreamStatusManager _streamStatusManager;
+    private readonly BroadcastScheduler _broadcastScheduler;
+    private readonly UserMessagesManagementService _userMessagesManagementService;
 
     private Bot? _bot;
     private bool _isConnected;
@@ -24,7 +28,10 @@ public partial class MainForm : Form
         SettingsManager settingsManager,
         TwitchOAuthService oauthService,
         StatisticsCollector statisticsCollector,
-        UserRankService userRankService)
+        UserRankService userRankService,
+        StreamStatusManager streamStatusManager,
+        BroadcastScheduler broadcastScheduler,
+        UserMessagesManagementService userMessagesManagementService)
     {
         _chatHistoryManager = chatHistoryManager;
         _httpServer = httpServer;
@@ -33,14 +40,20 @@ public partial class MainForm : Form
         _oauthService = oauthService;
         _statisticsCollector = statisticsCollector;
         _userRankService = userRankService;
+        _streamStatusManager = streamStatusManager;
+        _broadcastScheduler = broadcastScheduler;
+        _userMessagesManagementService = userMessagesManagementService;
 
         InitializeComponent();
 
         _connectionManager.ProgressChanged += OnConnectionProgress;
         _connectionManager.ConnectionCompleted += OnConnectionCompleted;
 
+        _streamStatusManager.StreamStatusChanged += _ => OnStreamStatusChanged();
+        _broadcastScheduler.StateChanged += OnBroadcastStateChanged;
+
         LoadSettings();
-        _broadcastInfoWidget.Setup(_settingsManager);
+        _broadcastInfoWidget.Setup(_settingsManager, _streamStatusManager, _broadcastScheduler);
         UpdateBroadcastButtonState();
         UpdateStreamStatus();
         InitializePanelVisibility();
@@ -60,7 +73,6 @@ public partial class MainForm : Form
     protected override async void OnFormClosed(FormClosedEventArgs e)
     {
         _connectionManager.CancelConnection();
-        _connectionManager.Dispose();
 
         if (_юзерФорма is { IsDisposed: false })
         {
@@ -98,13 +110,15 @@ public partial class MainForm : Form
 
     protected override async void OnFormClosing(FormClosingEventArgs e)
     {
+        _connectionManager.ProgressChanged -= OnConnectionProgress;
+        _connectionManager.ConnectionCompleted -= OnConnectionCompleted;
+
         if (_httpServer != null)
         {
             try
             {
+                _httpServer.LogMessage -= OnHttpServerLogMessage;
                 _settingsManager.ChatSettingsChanged -= _httpServer.NotifyChatSettingsChanged;
-
-                await _httpServer.DisposeAsync();
             }
             catch (Exception ex)
             {
@@ -171,13 +185,11 @@ public partial class MainForm : Form
             _bot.Connected += OnBotConnected;
             _bot.LogMessage += OnBotLogMessage;
             _bot.ConnectionProgress += OnBotConnectionProgress;
-            _bot.StreamStatusChanged += OnStreamStatusChanged;
-            _bot.BroadcastStateChanged += OnBroadcastStateChanged;
 
             _isConnected = true;
             _connectToolStripButton.Text = "🔌 Отключить";
             _connectToolStripButton.BackColor = Color.LightGreen;
-            _broadcastInfoWidget.Setup(_settingsManager, _bot);
+            _broadcastInfoWidget.Setup(_settingsManager, _streamStatusManager, _broadcastScheduler, _bot);
             UpdateBroadcastButtonState();
             UpdateStreamStatus();
             AddLogMessage("Бот успешно подключен!");
@@ -268,11 +280,6 @@ public partial class MainForm : Form
         AddLogMessage($"HTTP: {message}");
     }
 
-    private void OnStreamStatusChanged()
-    {
-        UpdateStreamStatus();
-    }
-
     private void OnBroadcastStateChanged()
     {
         _broadcastInfoWidget.UpdateState();
@@ -282,23 +289,23 @@ public partial class MainForm : Form
 
     private async void OnStreamInfoTimerTick(object? sender, EventArgs e)
     {
-        if (_bot == null)
+        if (_streamStatusManager.CurrentStatus == StreamStatus.Online)
         {
-            return;
-        }
-
-        if (_bot.StreamStatus == StreamStatus.Online)
-        {
-            await _bot.RefreshStreamInfoAsync();
+            await _streamStatusManager.RefreshCurrentStatusAsync();
             UpdateStreamInfo();
         }
+    }
+
+    private void OnStreamStatusChanged()
+    {
+        UpdateStreamStatus();
     }
 
     private void OnOpenUserStatistics()
     {
         if (_юзерФорма == null || _юзерФорма.IsDisposed)
         {
-            _юзерФорма = new(_statisticsCollector, _userRankService, _bot);
+            _юзерФорма = new(_statisticsCollector, _userRankService, _userMessagesManagementService, _bot);
             _юзерФорма.Show(this);
         }
         else
@@ -328,15 +335,9 @@ public partial class MainForm : Form
             return;
         }
 
-        if (_bot == null)
-        {
-            _streamInfoWidget.UpdateStatus(StreamStatus.Unknown, null);
-            return;
-        }
+        _streamInfoWidget.UpdateStatus(_streamStatusManager.CurrentStatus, _streamStatusManager.CurrentStream);
 
-        _streamInfoWidget.UpdateStatus(_bot.StreamStatus, _bot.CurrentStream);
-
-        if (_bot.StreamStatus == StreamStatus.Online)
+        if (_streamStatusManager.CurrentStatus == StreamStatus.Online)
         {
             if (!_streamInfoTimer.Enabled)
             {
@@ -587,8 +588,6 @@ public partial class MainForm : Form
             _bot.Connected -= OnBotConnected;
             _bot.LogMessage -= OnBotLogMessage;
             _bot.ConnectionProgress -= OnBotConnectionProgress;
-            _bot.StreamStatusChanged -= OnStreamStatusChanged;
-            _bot.BroadcastStateChanged -= OnBroadcastStateChanged;
 
             try
             {

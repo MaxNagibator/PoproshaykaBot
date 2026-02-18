@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using PoproshaykaBot.WinForms.Settings;
 using System.Diagnostics;
 using System.Text.Json;
@@ -5,7 +6,10 @@ using System.Text.Json.Serialization;
 
 namespace PoproshaykaBot.WinForms;
 
-public class TwitchOAuthService(SettingsManager settingsManager)
+public class TwitchOAuthService(
+    SettingsManager settingsManager,
+    IHttpClientFactory httpClientFactory,
+    ILogger<TwitchOAuthService> logger)
 {
     private TaskCompletionSource<string>? _authTcs;
 
@@ -29,7 +33,7 @@ public class TwitchOAuthService(SettingsManager settingsManager)
 
         var scopeString = string.Join(" ", scopes);
 
-        StatusChanged?.Invoke("Открытие браузера для авторизации...");
+        ReportStatus("Открытие браузера для авторизации...");
 
         var authUrl = $"https://id.twitch.tv/oauth2/authorize"
                       + $"?response_type=code"
@@ -49,10 +53,11 @@ public class TwitchOAuthService(SettingsManager settingsManager)
         }
         catch (Exception exception)
         {
+            logger.LogError(exception, "Не удалось открыть браузер для авторизации");
             throw new InvalidOperationException($"Не удалось открыть браузер: {exception.Message}", exception);
         }
 
-        StatusChanged?.Invoke("Ожидание авторизации пользователя...");
+        ReportStatus("Ожидание авторизации пользователя...");
 
         var authorizationCode = await _authTcs.Task;
 
@@ -61,10 +66,10 @@ public class TwitchOAuthService(SettingsManager settingsManager)
             throw new InvalidOperationException("Не удалось получить код авторизации");
         }
 
-        StatusChanged?.Invoke("Обмен кода на токен доступа...");
+        ReportStatus("Обмен кода на токен доступа...");
         var accessToken = await ExchangeCodeForTokenAsync(clientId, clientSecret, authorizationCode, redirectUri);
 
-        StatusChanged?.Invoke("Авторизация завершена успешно!");
+        ReportStatus("Авторизация завершена успешно!");
         return accessToken;
     }
 
@@ -87,14 +92,15 @@ public class TwitchOAuthService(SettingsManager settingsManager)
 
         try
         {
-            using var client = new HttpClient();
+            var client = httpClientFactory.CreateClient();
             var validateUrl = "https://id.twitch.tv/oauth2/validate";
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+            client.DefaultRequestHeaders.Authorization = new("Bearer", token);
             var response = await client.GetAsync(validateUrl);
             return response.IsSuccessStatusCode;
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Ошибка при проверке токена");
             return false;
         }
     }
@@ -106,9 +112,9 @@ public class TwitchOAuthService(SettingsManager settingsManager)
             throw new ArgumentException("Refresh token не может быть пустым", nameof(refreshToken));
         }
 
-        StatusChanged?.Invoke("Обновление токена доступа...");
+        ReportStatus("Обновление токена доступа...");
 
-        using var client = new HttpClient();
+        var client = httpClientFactory.CreateClient();
         var tokenUrl = "https://id.twitch.tv/oauth2/token";
 
         var formData = new Dictionary<string, string>
@@ -125,6 +131,7 @@ public class TwitchOAuthService(SettingsManager settingsManager)
 
         if (!response.IsSuccessStatusCode)
         {
+            logger.LogError("Ошибка обновления токена. Статус: {StatusCode}, Ответ: {Response}", response.StatusCode, jsonResponse);
             throw new InvalidOperationException($"Ошибка обновления токена: {jsonResponse}");
         }
 
@@ -135,17 +142,17 @@ public class TwitchOAuthService(SettingsManager settingsManager)
             throw new InvalidOperationException("Не удалось десериализовать ответ сервера");
         }
 
-        StatusChanged?.Invoke("Токен доступа обновлен успешно!");
+        ReportStatus("Токен доступа обновлен успешно!");
         return tokenResponse;
     }
 
     public async Task<string> GetValidTokenAsync(string clientId, string clientSecret, string currentToken, string refreshToken)
     {
-        StatusChanged?.Invoke("Проверка действительности токена...");
+        ReportStatus("Проверка действительности токена...");
 
         if (await IsTokenValidAsync(currentToken))
         {
-            StatusChanged?.Invoke("Токен действителен");
+            ReportStatus("Токен действителен");
             return currentToken;
         }
 
@@ -158,9 +165,73 @@ public class TwitchOAuthService(SettingsManager settingsManager)
         return tokenResponse.AccessToken;
     }
 
+    public async Task<string?> GetAccessTokenAsync()
+    {
+        var settings = settingsManager.Current.Twitch;
+
+        if (string.IsNullOrWhiteSpace(settings.ClientId) || string.IsNullOrWhiteSpace(settings.ClientSecret))
+        {
+            MessageBox.Show("OAuth настройки не настроены (ClientId/ClientSecret).", "Ошибка конфигурации OAuth", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(settings.AccessToken))
+        {
+            if (await IsTokenValidAsync(settings.AccessToken))
+            {
+                logger.LogInformation("Используется сохранённый токен доступа.");
+                return settings.AccessToken;
+            }
+
+            if (!string.IsNullOrWhiteSpace(settings.RefreshToken))
+            {
+                try
+                {
+                    logger.LogInformation("Обновление токена доступа...");
+
+                    var validToken = await GetValidTokenAsync(settings.ClientId,
+                        settings.ClientSecret,
+                        settings.AccessToken,
+                        settings.RefreshToken);
+
+                    logger.LogInformation("Токен доступа обновлён.");
+                    return validToken;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Не удалось обновить токен доступа");
+                    MessageBox.Show($"Не удалось обновить токен доступа: {ex.Message}", "Ошибка обновления токена", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        try
+        {
+            var accessToken = await StartOAuthFlowAsync(settings.ClientId,
+                settings.ClientSecret,
+                settings.Scopes,
+                settings.RedirectUri);
+
+            logger.LogInformation("OAuth авторизация завершена успешно.");
+            return accessToken;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "OAuth авторизация не удалась");
+            MessageBox.Show($"OAuth авторизация не удалась: {ex.Message}", "Ошибка OAuth авторизации", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return null;
+        }
+    }
+
+    private void ReportStatus(string status)
+    {
+        logger.LogInformation("OAuth Status: {Status}", status);
+        StatusChanged?.Invoke(status);
+    }
+
     private async Task<string> ExchangeCodeForTokenAsync(string clientId, string clientSecret, string authorizationCode, string redirectUri)
     {
-        using var client = new HttpClient();
+        var client = httpClientFactory.CreateClient();
         var tokenUrl = "https://id.twitch.tv/oauth2/token";
 
         var formData = new Dictionary<string, string>
@@ -178,6 +249,7 @@ public class TwitchOAuthService(SettingsManager settingsManager)
 
         if (!response.IsSuccessStatusCode)
         {
+            logger.LogError("Ошибка получения токена. Статус: {StatusCode}, Ответ: {Response}", response.StatusCode, jsonResponse);
             throw new InvalidOperationException($"Ошибка получения токена: {jsonResponse}");
         }
 

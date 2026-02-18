@@ -1,7 +1,6 @@
-﻿using PoproshaykaBot.WinForms.Broadcast;
+using PoproshaykaBot.WinForms.Broadcast;
 using PoproshaykaBot.WinForms.Chat;
 using PoproshaykaBot.WinForms.Models;
-using PoproshaykaBot.WinForms.Services;
 using PoproshaykaBot.WinForms.Settings;
 using TwitchLib.Api;
 using TwitchLib.Client;
@@ -29,20 +28,27 @@ public class Bot : IAsyncDisposable
     private bool _streamHandlersAttached;
 
     public Bot(
-        BotServices services,
+        SettingsManager settingsManager,
+        StatisticsCollector statisticsCollector,
+        TwitchAPI twitchApi,
+        ChatDecorationsProvider chatDecorationsProvider,
+        AudienceTracker audienceTracker,
+        ChatHistoryManager chatHistoryManager,
+        BroadcastScheduler broadcastScheduler,
+        ChatCommandProcessor commandProcessor,
+        StreamStatusManager streamStatusManager,
         TwitchClient client,
         TwitchChatMessenger messenger)
     {
-        _settings = services.Settings;
-        _statisticsCollector = services.StatisticsCollector;
-        _audienceTracker = services.AudienceTracker;
-        _chatHistoryManager = services.ChatHistoryManager;
-        _twitchApi = services.TwitchApi;
-        _chatDecorations = services.ChatDecorationsProvider;
-        _broadcastScheduler = services.BroadcastScheduler;
-        _commandProcessor = services.CommandProcessor;
-        _streamStatusManager = services.StreamStatusManager;
-        MessagesManagementService = services.UserMessagesManagementService;
+        _settings = settingsManager.Current.Twitch;
+        _statisticsCollector = statisticsCollector;
+        _audienceTracker = audienceTracker;
+        _chatHistoryManager = chatHistoryManager;
+        _twitchApi = twitchApi;
+        _chatDecorations = chatDecorationsProvider;
+        _broadcastScheduler = broadcastScheduler;
+        _commandProcessor = commandProcessor;
+        _streamStatusManager = streamStatusManager;
 
         _client = client;
         _messenger = messenger;
@@ -52,12 +58,8 @@ public class Bot : IAsyncDisposable
         _client.OnConnected += Client_OnConnected;
         _client.OnJoinedChannel += Сlient_OnJoinedChannel;
 
-        _broadcastScheduler.StateChanged += () => BroadcastStateChanged?.Invoke();
-
         AttachStreamStatusHandlers();
     }
-
-    public event Action? BroadcastStateChanged;
 
     public event Action<string>? Connected;
 
@@ -65,34 +67,7 @@ public class Bot : IAsyncDisposable
 
     public event Action<string>? LogMessage;
 
-    public event Action? StreamStatusChanged;
-
-    public bool IsAutoBroadcastEnabled
-    {
-        get => _settings.AutoBroadcast.AutoBroadcastEnabled;
-        set
-        {
-            if (_settings.AutoBroadcast.AutoBroadcastEnabled == value)
-            {
-                return;
-            }
-
-            _settings.AutoBroadcast.AutoBroadcastEnabled = value;
-            LogMessage?.Invoke($"Режим рассылки изменен на: {(value ? "Авто" : "Ручной")}");
-            UpdateStreamState(StreamStatus);
-            BroadcastStateChanged?.Invoke();
-        }
-    }
-
-    public UserMessagesManagementService MessagesManagementService { get; }
     public string? Channel { get; private set; }
-
-    public bool IsBroadcastActive => _broadcastScheduler.IsActive;
-
-    public StreamStatus StreamStatus => _streamStatusManager.CurrentStatus;
-    public StreamInfo? CurrentStream => _streamStatusManager.CurrentStream;
-    public int BroadcastSentMessagesCount => _broadcastScheduler.SentMessagesCount;
-    public DateTime? NextBroadcastTime => _broadcastScheduler.NextBroadcastTime;
 
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
@@ -172,11 +147,6 @@ public class Bot : IAsyncDisposable
         }
     }
 
-    public async Task RefreshStreamInfoAsync()
-    {
-        await _streamStatusManager.RefreshCurrentStatusAsync();
-    }
-
     public async Task DisconnectAsync()
     {
         if (_client.IsConnected)
@@ -240,26 +210,6 @@ public class Bot : IAsyncDisposable
         }
     }
 
-    public void StartBroadcast()
-    {
-        if (string.IsNullOrWhiteSpace(Channel))
-        {
-            return;
-        }
-
-        _broadcastScheduler.Start(Channel);
-    }
-
-    public void StopBroadcast()
-    {
-        _broadcastScheduler.Stop();
-    }
-
-    public Task ManualBroadcastSendAsync()
-    {
-        return _broadcastScheduler.ManualSendAsync();
-    }
-
     public async ValueTask DisposeAsync()
     {
         await DisposeAsyncCore();
@@ -275,9 +225,12 @@ public class Bot : IAsyncDisposable
 
         await DisconnectAsync();
         DetachStreamStatusHandlers();
-        await _streamStatusManager.DisposeAsync();
-        await _broadcastScheduler.DisposeAsync();
-        await _statisticsCollector.StopAsync();
+
+        _client.OnLog -= Client_OnLog;
+        _client.OnMessageReceived -= Client_OnMessageReceived;
+        _client.OnConnected -= Client_OnConnected;
+        _client.OnJoinedChannel -= Сlient_OnJoinedChannel;
+
         _disposed = true;
     }
 
@@ -293,24 +246,26 @@ public class Bot : IAsyncDisposable
     {
         if (status == StreamStatus.Online)
         {
-            if (_settings.AutoBroadcast.AutoBroadcastEnabled && !IsBroadcastActive)
+            if (_settings.AutoBroadcast.AutoBroadcastEnabled && !_broadcastScheduler.IsActive)
             {
-                StartBroadcast();
-                LogMessage?.Invoke("🔴 Стрим онлайн. Автоматически запускаю рассылку.");
-
-                if (_settings.AutoBroadcast.StreamStatusNotificationsEnabled
-                    && !string.IsNullOrEmpty(_settings.AutoBroadcast.StreamStartMessage)
-                    && !string.IsNullOrEmpty(Channel))
+                if (!string.IsNullOrWhiteSpace(Channel))
                 {
-                    _messenger.Send(Channel, _settings.AutoBroadcast.StreamStartMessage);
+                    _broadcastScheduler.Start(Channel);
+                    LogMessage?.Invoke("🔴 Стрим онлайн. Автоматически запускаю рассылку.");
+
+                    if (_settings.AutoBroadcast.StreamStatusNotificationsEnabled
+                        && !string.IsNullOrEmpty(_settings.AutoBroadcast.StreamStartMessage))
+                    {
+                        _messenger.Send(Channel, _settings.AutoBroadcast.StreamStartMessage);
+                    }
                 }
             }
         }
         else if (status == StreamStatus.Offline)
         {
-            if (_settings.AutoBroadcast.AutoBroadcastEnabled && IsBroadcastActive)
+            if (_settings.AutoBroadcast.AutoBroadcastEnabled && _broadcastScheduler.IsActive)
             {
-                StopBroadcast();
+                _broadcastScheduler.Stop();
                 LogMessage?.Invoke("⚫ Стрим офлайн. Автоматически останавливаю рассылку.");
 
                 if (_settings.AutoBroadcast.StreamStatusNotificationsEnabled
@@ -321,8 +276,6 @@ public class Bot : IAsyncDisposable
                 }
             }
         }
-
-        StreamStatusChanged?.Invoke();
     }
 
     private void OnMonitoringLogMessage(string message)
@@ -493,11 +446,6 @@ public class Bot : IAsyncDisposable
 
     private async Task InitializeStreamMonitoringAsync()
     {
-        if (_streamStatusManager == null)
-        {
-            return;
-        }
-
         try
         {
             if (string.IsNullOrEmpty(_settings.ClientId))

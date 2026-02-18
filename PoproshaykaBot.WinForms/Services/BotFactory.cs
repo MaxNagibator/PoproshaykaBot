@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using PoproshaykaBot.WinForms.Broadcast;
 using PoproshaykaBot.WinForms.Chat;
 using PoproshaykaBot.WinForms.Chat.Commands;
@@ -10,17 +11,20 @@ using TwitchLib.Communication.Models;
 
 namespace PoproshaykaBot.WinForms.Services;
 
-public sealed class BotFactory(
-    SettingsManager settingsManager,
-    StatisticsCollector statistics,
-    TwitchAPI twitchApi,
-    ChatDecorationsProvider chatDecorationsProvider,
-    ChatHistoryManager chatHistoryManager,
-    StreamStatusManager streamStatusManager,
-    UserRankService userRankService)
+public sealed class BotFactory(IServiceProvider serviceProvider)
 {
     public Bot Create(string accessToken)
     {
+        var settingsManager = serviceProvider.GetRequiredService<SettingsManager>();
+        var statistics = serviceProvider.GetRequiredService<StatisticsCollector>();
+        var twitchApi = serviceProvider.GetRequiredService<TwitchAPI>();
+        var chatDecorationsProvider = serviceProvider.GetRequiredService<ChatDecorationsProvider>();
+        var chatHistoryManager = serviceProvider.GetRequiredService<ChatHistoryManager>();
+        var streamStatusManager = serviceProvider.GetRequiredService<StreamStatusManager>();
+        var userRankService = serviceProvider.GetRequiredService<UserRankService>();
+        var messenger = serviceProvider.GetRequiredService<TwitchChatMessenger>();
+        var broadcastScheduler = serviceProvider.GetRequiredService<BroadcastScheduler>();
+
         var settings = settingsManager.Current.Twitch;
         var credentials = new ConnectionCredentials(settings.BotUsername, accessToken);
 
@@ -35,28 +39,10 @@ public sealed class BotFactory(
         var twitchClient = new TwitchClient(wsClient);
         twitchClient.Initialize(credentials, settings.Channel);
 
-        // TODO: Переделать
         twitchApi.Settings.ClientId = settings.ClientId;
         twitchApi.Settings.AccessToken = accessToken;
 
-        var messenger = new TwitchChatMessenger(twitchClient, settingsManager);
-        messenger.MessageSent += chatHistoryManager.AddMessage;
-
-        var messageProvider = new Func<int, string>(counter =>
-        {
-            var template = settings.AutoBroadcast.BroadcastMessageTemplate;
-            var info = streamStatusManager.CurrentStream;
-
-            return template
-                .Replace("{counter}", counter.ToString())
-                .Replace("{title}", info?.Title ?? string.Empty)
-                .Replace("{game}", info?.GameName ?? string.Empty)
-                .Replace("{viewers}", info?.ViewerCount.ToString() ?? string.Empty);
-        });
-
-        var broadcastScheduler = new BroadcastScheduler(messenger, settingsManager, messageProvider);
         var audienceTracker = new AudienceTracker(settingsManager);
-        var userMessagesManagementService = new UserMessagesManagementService(statistics, messenger, settingsManager);
 
         var commands = new List<IChatCommand>
         {
@@ -77,7 +63,7 @@ public sealed class BotFactory(
         var commandProcessor = new ChatCommandProcessor(commands);
         commandProcessor.Register(new HelpCommand(commandProcessor.GetAllCommands));
 
-        var services = new BotServices(settings,
+        return new(settingsManager,
             statistics,
             twitchApi,
             chatDecorationsProvider,
@@ -86,8 +72,7 @@ public sealed class BotFactory(
             broadcastScheduler,
             commandProcessor,
             streamStatusManager,
-            userMessagesManagementService);
-
-        return new(services, twitchClient, messenger);
+            twitchClient,
+            messenger);
     }
 }

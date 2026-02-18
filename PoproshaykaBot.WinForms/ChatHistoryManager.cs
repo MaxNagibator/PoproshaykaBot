@@ -8,6 +8,7 @@ public class ChatHistoryManager(SettingsManager settingsManager)
     private readonly object _sync = new();
     private readonly LinkedList<ChatMessageData> _chatHistory = [];
     private readonly List<IChatDisplay> _chatDisplays = [];
+    private readonly object _displaysSync = new();
 
     public void AddMessage(ChatMessageData chatMessage)
     {
@@ -23,7 +24,13 @@ public class ChatHistoryManager(SettingsManager settingsManager)
             }
         }
 
-        foreach (var display in _chatDisplays.ToList())
+        List<IChatDisplay> displays;
+        lock (_displaysSync)
+        {
+            displays = _chatDisplays.ToList();
+        }
+
+        foreach (var display in displays)
         {
             try
             {
@@ -38,15 +45,21 @@ public class ChatHistoryManager(SettingsManager settingsManager)
 
     public void RegisterChatDisplay(IChatDisplay chatDisplay)
     {
-        if (_chatDisplays.Contains(chatDisplay) == false)
+        lock (_displaysSync)
         {
-            _chatDisplays.Add(chatDisplay);
+            if (_chatDisplays.Contains(chatDisplay) == false)
+            {
+                _chatDisplays.Add(chatDisplay);
+            }
         }
     }
 
     public void UnregisterChatDisplay(IChatDisplay chatDisplay)
     {
-        _chatDisplays.Remove(chatDisplay);
+        lock (_displaysSync)
+        {
+            _chatDisplays.Remove(chatDisplay);
+        }
     }
 
     public IEnumerable<ChatMessageData> GetHistory()
@@ -64,7 +77,13 @@ public class ChatHistoryManager(SettingsManager settingsManager)
             _chatHistory.Clear();
         }
 
-        foreach (var display in _chatDisplays.ToList())
+        List<IChatDisplay> displays;
+        lock (_displaysSync)
+        {
+            displays = _chatDisplays.ToList();
+        }
+
+        foreach (var display in displays)
         {
             try
             {

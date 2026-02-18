@@ -1,8 +1,6 @@
-using PoproshaykaBot.WinForms.Services;
-
 namespace PoproshaykaBot.WinForms;
 
-public sealed class BotConnectionManager(Func<string, Bot> botFactory, TokenService tokenService) : IDisposable
+public sealed class BotConnectionManager(Func<string, Bot> botFactory, TwitchOAuthService tokenService) : IDisposable
 {
     private CancellationTokenSource? _cts;
     private Task? _connectionTask;

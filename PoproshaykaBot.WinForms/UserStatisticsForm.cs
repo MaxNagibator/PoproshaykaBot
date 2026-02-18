@@ -7,6 +7,7 @@ public sealed partial class UserStatisticsForm : Form
 {
     private readonly StatisticsCollector? _statisticsCollector;
     private readonly UserRankService _userRankService;
+    private readonly UserMessagesManagementService _userMessagesManagementService;
     private Bot? _bot;
     private List<UserStatistics> _allUsers = [];
     private List<UserStatistics> _filteredUsers = [];
@@ -14,11 +15,14 @@ public sealed partial class UserStatisticsForm : Form
     public UserStatisticsForm(
         StatisticsCollector statisticsCollector,
         UserRankService userRankService,
+        UserMessagesManagementService userMessagesManagementService,
         Bot? bot = null)
     {
         _statisticsCollector = statisticsCollector;
         _userRankService = userRankService;
+        _userMessagesManagementService = userMessagesManagementService;
         _bot = bot;
+
         InitializeComponent();
         InitializeRuntime();
         LoadData();
@@ -77,21 +81,14 @@ public sealed partial class UserStatisticsForm : Form
 
         bool updated;
 
-        var managementService = _bot?.MessagesManagementService;
-        if (managementService == null)
-        {
-            MessageBox.Show("⚠️ Сервис управления сообщениями недоступен.", "⚠️ Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
-        }
-
         if (delta < 0)
         {
-            var notificationMessage = managementService.GetPunishmentNotification(user.Name, (ulong)-delta);
+            var notificationMessage = _userMessagesManagementService.GetPunishmentNotification(user.Name, (ulong)-delta);
             MessageBox.Show(notificationMessage, "🏴‍☠️ Наказание от СЕРЁГИ ПИРАТА! ⚔️", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
             try
             {
-                updated = managementService.PunishUser(user.UserId, user.Name, (ulong)-delta, _bot?.Channel);
+                updated = _userMessagesManagementService.PunishUser(user.UserId, user.Name, (ulong)-delta, _bot?.Channel);
             }
             catch (Exception exception)
             {
@@ -101,12 +98,12 @@ public sealed partial class UserStatisticsForm : Form
         }
         else
         {
-            var notificationMessage = managementService.GetRewardNotification(user.Name, (ulong)delta);
+            var notificationMessage = _userMessagesManagementService.GetRewardNotification(user.Name, (ulong)delta);
             MessageBox.Show(notificationMessage, "🎉 Поощрение от СЕРЁГИ ПИРАТА! 🏆", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             try
             {
-                updated = managementService.RewardUser(user.UserId, user.Name, (ulong)delta, _bot?.Channel);
+                updated = _userMessagesManagementService.RewardUser(user.UserId, user.Name, (ulong)delta, _bot?.Channel);
             }
             catch (Exception exception)
             {

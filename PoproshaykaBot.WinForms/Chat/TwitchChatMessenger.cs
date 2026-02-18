@@ -34,6 +34,7 @@ public sealed class TwitchChatMessenger(TwitchClient client, SettingsManager set
         if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
         {
             yield return text;
+
             yield break;
         }
 
@@ -54,6 +55,7 @@ public sealed class TwitchChatMessenger(TwitchClient client, SettingsManager set
                 if (builder.Length > 0)
                 {
                     yield return builder.ToString();
+
                     builder.Clear();
                 }
 
