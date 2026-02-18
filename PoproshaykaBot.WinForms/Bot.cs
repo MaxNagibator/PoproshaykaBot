@@ -2,7 +2,6 @@ using PoproshaykaBot.WinForms.Broadcast;
 using PoproshaykaBot.WinForms.Chat;
 using PoproshaykaBot.WinForms.Models;
 using PoproshaykaBot.WinForms.Settings;
-using TwitchLib.Api;
 using TwitchLib.Client;
 using TwitchLib.Client.Events;
 using TwitchLib.Client.Models;
@@ -15,7 +14,6 @@ public class Bot : IAsyncDisposable
     private readonly TwitchClient _client;
     private readonly ChatHistoryManager _chatHistoryManager;
     private readonly TwitchChatMessenger _messenger;
-    private readonly TwitchAPI _twitchApi;
     private readonly TwitchSettings _settings;
     private readonly StatisticsCollector _statisticsCollector;
     private readonly AudienceTracker _audienceTracker;
@@ -30,7 +28,6 @@ public class Bot : IAsyncDisposable
     public Bot(
         SettingsManager settingsManager,
         StatisticsCollector statisticsCollector,
-        TwitchAPI twitchApi,
         ChatDecorationsProvider chatDecorationsProvider,
         AudienceTracker audienceTracker,
         ChatHistoryManager chatHistoryManager,
@@ -44,7 +41,6 @@ public class Bot : IAsyncDisposable
         _statisticsCollector = statisticsCollector;
         _audienceTracker = audienceTracker;
         _chatHistoryManager = chatHistoryManager;
-        _twitchApi = twitchApi;
         _chatDecorations = chatDecorationsProvider;
         _broadcastScheduler = broadcastScheduler;
         _commandProcessor = commandProcessor;
@@ -454,13 +450,13 @@ public class Bot : IAsyncDisposable
                 return;
             }
 
-            if (string.IsNullOrEmpty(_twitchApi.Settings.AccessToken))
+            if (string.IsNullOrEmpty(_settings.AccessToken))
             {
                 LogMessage?.Invoke("Access Token не установлен. Мониторинг стрима недоступен.");
                 return;
             }
 
-            await _streamStatusManager.InitializeAsync(_settings.ClientId, _twitchApi.Settings.AccessToken);
+            await _streamStatusManager.InitializeAsync();
             await _streamStatusManager.StartMonitoringAsync(_settings.Channel);
         }
         catch (Exception ex)

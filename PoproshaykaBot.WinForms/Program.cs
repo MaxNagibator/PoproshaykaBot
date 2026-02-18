@@ -9,6 +9,8 @@ using PoproshaykaBot.WinForms.Settings;
 using System.Diagnostics;
 using TwitchLib.Api;
 using TwitchLib.Client;
+using TwitchLib.Communication.Clients;
+using TwitchLib.Communication.Models;
 using TwitchLib.EventSub.Websockets;
 using Timer = System.Windows.Forms.Timer;
 
@@ -120,8 +122,29 @@ public static class Program
         services.AddHttpClient();
 
         services.AddSingleton<SettingsManager>();
-        services.AddTransient<TwitchAPI>();
-        services.AddSingleton<TwitchClient>();
+
+        services.AddSingleton<TwitchAPI>(sp =>
+        {
+            var settings = sp.GetRequiredService<SettingsManager>().Current.Twitch;
+            var api = new TwitchAPI();
+            api.Settings.ClientId = settings.ClientId;
+            return api;
+        });
+
+        services.AddSingleton<TwitchClient>(sp =>
+        {
+            var settings = sp.GetRequiredService<SettingsManager>().Current.Twitch;
+            var clientOptions = new ClientOptions
+            {
+                MessagesAllowedInPeriod = settings.MessagesAllowedInPeriod,
+                ThrottlingPeriod = TimeSpan.FromSeconds(settings.ThrottlingPeriodSeconds),
+                DisconnectWait = 0,
+            };
+
+            var wsClient = new WebSocketClient(clientOptions);
+            return new(wsClient);
+        });
+
         services.AddSingleton<StatisticsCollector>();
         services.AddSingleton<TwitchOAuthService>();
         services.AddSingleton<ChatHistoryManager>();
@@ -195,7 +218,7 @@ public static class Program
 
         services.AddSingleton<BotFactory>();
 
-        services.AddTransient<Func<string, Bot>>(sp =>
+        services.AddTransient<Func<Bot>>(sp =>
         {
             var factory = sp.GetRequiredService<BotFactory>();
             return factory.Create;

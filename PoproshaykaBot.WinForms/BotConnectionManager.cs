@@ -1,6 +1,6 @@
 namespace PoproshaykaBot.WinForms;
 
-public sealed class BotConnectionManager(Func<string, Bot> botFactory, TwitchOAuthService tokenService) : IDisposable
+public sealed class BotConnectionManager(Func<Bot> botFactory, TwitchOAuthService tokenService) : IDisposable
 {
     private CancellationTokenSource? _cts;
     private Task? _connectionTask;
@@ -56,7 +56,7 @@ public sealed class BotConnectionManager(Func<string, Bot> botFactory, TwitchOAu
             }
 
             ReportProgress("Создание экземпляра бота...");
-            var bot = botFactory(accessToken);
+            var bot = botFactory();
 
             ReportProgress("Подключение к серверу Twitch...");
             await bot.ConnectAsync(ct);

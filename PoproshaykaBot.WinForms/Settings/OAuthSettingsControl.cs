@@ -275,10 +275,8 @@ public partial class OAuthSettingsControl : UserControl
             return;
         }
 
-        _settings.Twitch.AccessToken = string.Empty;
-        _settings.Twitch.RefreshToken = string.Empty;
-
-        _settingsManager?.SaveSettings(_settings);
+        _oauthService.ClearTokens();
+        _settings = _settingsManager.Current;
 
         LoadTokenInformation();
         _tokenStatusValueLabel.Text = "Токены очищены";

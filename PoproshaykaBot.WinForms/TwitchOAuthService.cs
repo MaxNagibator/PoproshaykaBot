@@ -5,13 +5,15 @@ using System.Security;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using TwitchLib.Api;
 
 namespace PoproshaykaBot.WinForms;
 
 public class TwitchOAuthService(
     SettingsManager settingsManager,
     IHttpClientFactory httpClientFactory,
-    ILogger<TwitchOAuthService> logger)
+    ILogger<TwitchOAuthService> logger,
+    TwitchAPI twitchApi)
 {
     private readonly SemaphoreSlim _authSemaphore = new(1, 1);
     private TaskCompletionSource<string>? _authTcs;
@@ -194,6 +196,7 @@ public class TwitchOAuthService(
             ReportStatus("Проверка действительности токена...");
             if (await IsTokenValidAsync(settings.AccessToken))
             {
+                SyncTwitchApi(settings.AccessToken);
                 logger.LogInformation("Используется сохранённый токен доступа.");
                 return settings.AccessToken;
             }
@@ -222,6 +225,7 @@ public class TwitchOAuthService(
         settings.Twitch.AccessToken = accessToken;
         settings.Twitch.RefreshToken = refreshToken;
         settingsManager.SaveSettings(settings);
+        SyncTwitchApi(accessToken);
     }
 
     public void ClearTokens()
@@ -230,7 +234,15 @@ public class TwitchOAuthService(
         settings.Twitch.AccessToken = string.Empty;
         settings.Twitch.RefreshToken = string.Empty;
         settingsManager.SaveSettings(settings);
+        twitchApi.Settings.AccessToken = string.Empty;
         ReportStatus("Токены очищены.");
+    }
+
+    private void SyncTwitchApi(string accessToken)
+    {
+        var settings = settingsManager.Current.Twitch;
+        twitchApi.Settings.ClientId = settings.ClientId;
+        twitchApi.Settings.AccessToken = accessToken;
     }
 
     private void ReportStatus(string status)

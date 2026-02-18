@@ -51,23 +51,9 @@ public class StreamStatusManager : IAsyncDisposable
     public StreamStatus CurrentStatus { get; private set; } = StreamStatus.Unknown;
     public StreamInfo? CurrentStream { get; private set; }
 
-    public Task InitializeAsync(string clientId, string accessToken)
+    public Task InitializeAsync()
     {
-        if (string.IsNullOrEmpty(clientId))
-        {
-            throw new ArgumentException("Client ID не может быть пустым", nameof(clientId));
-        }
-
-        if (string.IsNullOrEmpty(accessToken))
-        {
-            throw new ArgumentException("Access Token не может быть пустым", nameof(accessToken));
-        }
-
         _broadcasterUserId = null;
-
-        _twitchApi.Settings.ClientId = clientId;
-        _twitchApi.Settings.AccessToken = accessToken;
-
         _stopRequested = false;
         _isInitialized = true;
         CurrentStatus = StreamStatus.Unknown;
