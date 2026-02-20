@@ -8,6 +8,8 @@ sealed partial class StreamInfoWidget
     {
         if (disposing && (components != null))
         {
+            ClearThumbnail();
+            _openChannelButton.Click -= OnOpenChannelClick;
             components.Dispose();
         }
         base.Dispose(disposing);

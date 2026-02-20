@@ -5,20 +5,15 @@ namespace PoproshaykaBot.WinForms.Models;
 public class UserStatistics
 {
     public string UserId { get; set; } = string.Empty;
-
     public string Name { get; set; } = string.Empty;
-
     public ulong MessageCount { get; set; }
-
     public ulong ShtrafMessageCount { get; set; }
-
     public ulong BonusMessageCount { get; set; }
 
     [JsonIgnore]
     public long TotalMessageCount => (long)MessageCount + (long)BonusMessageCount - (long)ShtrafMessageCount;
 
     public DateTime FirstSeen { get; set; } = DateTime.UtcNow;
-
     public DateTime LastSeen { get; set; } = DateTime.UtcNow;
 
     public static UserStatistics Create(string userId, string name)
@@ -49,5 +44,19 @@ public class UserStatistics
         }
 
         Name = newName;
+    }
+
+    public UserStatistics Clone()
+    {
+        return new()
+        {
+            UserId = UserId,
+            Name = Name,
+            MessageCount = MessageCount,
+            ShtrafMessageCount = ShtrafMessageCount,
+            BonusMessageCount = BonusMessageCount,
+            FirstSeen = FirstSeen,
+            LastSeen = LastSeen,
+        };
     }
 }

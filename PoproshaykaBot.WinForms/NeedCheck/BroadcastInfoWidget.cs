@@ -6,7 +6,7 @@ namespace PoproshaykaBot.WinForms;
 
 public sealed partial class BroadcastInfoWidget : UserControl
 {
-    private Bot? _bot;
+    private IChannelProvider? _channelProvider;
     private SettingsManager? _settingsManager;
     private StreamStatusManager? _streamStatusManager;
     private BroadcastScheduler? _broadcastScheduler;
@@ -20,12 +20,12 @@ public sealed partial class BroadcastInfoWidget : UserControl
         SettingsManager settingsManager,
         StreamStatusManager streamStatusManager,
         BroadcastScheduler broadcastScheduler,
-        Bot? bot = null)
+        IChannelProvider channelProvider)
     {
         _settingsManager = settingsManager;
         _streamStatusManager = streamStatusManager;
         _broadcastScheduler = broadcastScheduler;
-        _bot = bot;
+        _channelProvider = channelProvider;
         UpdateState();
     }
 
@@ -37,7 +37,7 @@ public sealed partial class BroadcastInfoWidget : UserControl
             return;
         }
 
-        if (_bot == null || _broadcastScheduler == null || _streamStatusManager == null)
+        if (_channelProvider == null || _broadcastScheduler == null || _streamStatusManager == null)
         {
             _statusLabel.Text = "Бот не подключен";
             _statusLabel.ForeColor = Color.Gray;
@@ -147,9 +147,9 @@ public sealed partial class BroadcastInfoWidget : UserControl
         {
             if (_streamStatusManager.CurrentStatus == StreamStatus.Online)
             {
-                if (!_broadcastScheduler.IsActive && !string.IsNullOrEmpty(_bot?.Channel))
+                if (!_broadcastScheduler.IsActive && !string.IsNullOrEmpty(_channelProvider?.Channel))
                 {
-                    _broadcastScheduler.Start(_bot.Channel);
+                    _broadcastScheduler.Start(_channelProvider.Channel);
                 }
             }
             else
@@ -163,7 +163,7 @@ public sealed partial class BroadcastInfoWidget : UserControl
 
     private void OnToggleButtonClick(object sender, EventArgs e)
     {
-        if (_bot == null || _broadcastScheduler == null || _settingsManager == null)
+        if (_channelProvider == null || _broadcastScheduler == null || _settingsManager == null)
         {
             return;
         }
@@ -188,9 +188,9 @@ public sealed partial class BroadcastInfoWidget : UserControl
                 return;
             }
 
-            if (!string.IsNullOrEmpty(_bot.Channel))
+            if (!string.IsNullOrEmpty(_channelProvider.Channel))
             {
-                _broadcastScheduler.Start(_bot.Channel);
+                _broadcastScheduler.Start(_channelProvider.Channel);
             }
         }
 
@@ -199,13 +199,20 @@ public sealed partial class BroadcastInfoWidget : UserControl
 
     private async void OnSendNowButtonClick(object sender, EventArgs e)
     {
-        if (_broadcastScheduler == null)
+        try
         {
-            return;
-        }
+            if (_broadcastScheduler == null)
+            {
+                return;
+            }
 
-        _sendNowButton.Enabled = false;
-        await _broadcastScheduler.ManualSendAsync();
-        _sendNowButton.Enabled = true;
+            _sendNowButton.Enabled = false;
+            await _broadcastScheduler.ManualSendAsync();
+            _sendNowButton.Enabled = true;
+        }
+        catch (Exception ex)
+        {
+            throw; // TODO handle exception
+        }
     }
 }

@@ -3,6 +3,7 @@ using PoproshaykaBot.WinForms.Settings;
 
 namespace PoproshaykaBot.WinForms;
 
+// TODO: Шляпа. Переделать на события
 public class ChatHistoryManager(SettingsManager settingsManager)
 {
     private readonly object _sync = new();

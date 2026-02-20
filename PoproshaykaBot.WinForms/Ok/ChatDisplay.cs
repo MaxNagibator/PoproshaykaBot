@@ -2,6 +2,7 @@
 
 namespace PoproshaykaBot.WinForms;
 
+// TODO:Удалить и заменить на Twitch-чат
 public partial class ChatDisplay : UserControl, IChatDisplay
 {
     private const int MaxChatLines = 200;

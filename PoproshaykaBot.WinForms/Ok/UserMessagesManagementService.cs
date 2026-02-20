@@ -25,10 +25,7 @@ public sealed class UserMessagesManagementService(
         var messageSettings = settingsManager.Current.Twitch.Messages;
         if (messageSettings.PunishmentEnabled && !string.IsNullOrWhiteSpace(channel))
         {
-            var message = messageSettings.PunishmentMessage
-                .Replace("{username}", userName)
-                .Replace("{count}", removedMessagesCount.ToString());
-
+            var message = FormatMessage(messageSettings.PunishmentMessage, userName, removedMessagesCount);
             messenger.Send(channel, message);
         }
 
@@ -52,10 +49,7 @@ public sealed class UserMessagesManagementService(
         var messageSettings = settingsManager.Current.Twitch.Messages;
         if (messageSettings.RewardEnabled && !string.IsNullOrWhiteSpace(channel))
         {
-            var message = messageSettings.RewardMessage
-                .Replace("{username}", userName)
-                .Replace("{count}", addedMessagesCount.ToString());
-
+            var message = FormatMessage(messageSettings.RewardMessage, userName, addedMessagesCount);
             messenger.Send(channel, message);
         }
 
@@ -65,16 +59,19 @@ public sealed class UserMessagesManagementService(
     public string GetPunishmentNotification(string userName, ulong removedMessagesCount)
     {
         var messageSettings = settingsManager.Current.Twitch.Messages;
-        return messageSettings.PunishmentNotification
-            .Replace("{username}", userName)
-            .Replace("{count}", removedMessagesCount.ToString());
+        return FormatMessage(messageSettings.PunishmentNotification, userName, removedMessagesCount);
     }
 
     public string GetRewardNotification(string userName, ulong addedMessagesCount)
     {
         var messageSettings = settingsManager.Current.Twitch.Messages;
-        return messageSettings.RewardNotification
+        return FormatMessage(messageSettings.RewardNotification, userName, addedMessagesCount);
+    }
+
+    private static string FormatMessage(string template, string userName, ulong count)
+    {
+        return template
             .Replace("{username}", userName)
-            .Replace("{count}", addedMessagesCount.ToString());
+            .Replace("{count}", count.ToString());
     }
 }

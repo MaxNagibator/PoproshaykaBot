@@ -5,10 +5,11 @@ namespace PoproshaykaBot.WinForms;
 
 public sealed partial class UserStatisticsForm : Form
 {
-    private readonly StatisticsCollector? _statisticsCollector;
+    private readonly StatisticsCollector _statisticsCollector;
     private readonly UserRankService _userRankService;
     private readonly UserMessagesManagementService _userMessagesManagementService;
-    private Bot? _bot;
+    private readonly IChannelProvider _channelProvider;
+
     private List<UserStatistics> _allUsers = [];
     private List<UserStatistics> _filteredUsers = [];
 
@@ -16,12 +17,12 @@ public sealed partial class UserStatisticsForm : Form
         StatisticsCollector statisticsCollector,
         UserRankService userRankService,
         UserMessagesManagementService userMessagesManagementService,
-        Bot? bot = null)
+        IChannelProvider channelProvider)
     {
         _statisticsCollector = statisticsCollector;
         _userRankService = userRankService;
         _userMessagesManagementService = userMessagesManagementService;
-        _bot = bot;
+        _channelProvider = channelProvider;
 
         InitializeComponent();
         InitializeRuntime();
@@ -31,11 +32,6 @@ public sealed partial class UserStatisticsForm : Form
     private UserStatisticsForm()
     {
         InitializeComponent();
-    }
-
-    public void UpdateBotReference(Bot? bot)
-    {
-        _bot = bot;
     }
 
     private void textBoxFilter_TextChanged(object sender, EventArgs e)
@@ -65,11 +61,11 @@ public sealed partial class UserStatisticsForm : Form
             return;
         }
 
-        if (_statisticsCollector == null)
+        /*if (_statisticsCollector == null)
         {
             MessageBox.Show("❌ Статистика недоступна.", "❌ Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
-        }
+        }*/
 
         var delta = (long)numericIncrement.Value;
 
@@ -88,7 +84,7 @@ public sealed partial class UserStatisticsForm : Form
 
             try
             {
-                updated = _userMessagesManagementService.PunishUser(user.UserId, user.Name, (ulong)-delta, _bot?.Channel);
+                updated = _userMessagesManagementService.PunishUser(user.UserId, user.Name, (ulong)-delta, _channelProvider.Channel);
             }
             catch (Exception exception)
             {
@@ -103,7 +99,7 @@ public sealed partial class UserStatisticsForm : Form
 
             try
             {
-                updated = _userMessagesManagementService.RewardUser(user.UserId, user.Name, (ulong)delta, _bot?.Channel);
+                updated = _userMessagesManagementService.RewardUser(user.UserId, user.Name, (ulong)delta, _channelProvider.Channel);
             }
             catch (Exception exception)
             {
@@ -206,11 +202,6 @@ public sealed partial class UserStatisticsForm : Form
 
     private void LoadData()
     {
-        if (_statisticsCollector == null)
-        {
-            return;
-        }
-
         _allUsers = _statisticsCollector.GetAllUsers();
         UpdateGlobalStats();
         ApplyFilter();
@@ -218,11 +209,6 @@ public sealed partial class UserStatisticsForm : Form
 
     private void RefreshUserList()
     {
-        if (_statisticsCollector == null)
-        {
-            return;
-        }
-
         var currentFilter = textBoxFilter.Text;
         var selectedUserId = listViewUsers.SelectedItems.Count > 0 ? (listViewUsers.SelectedItems[0].Tag as UserStatistics)?.UserId : null;
 
@@ -297,14 +283,15 @@ public sealed partial class UserStatisticsForm : Form
 
     private void UpdateGlobalStats()
     {
-        if (_allUsers == null || _allUsers.Count == 0)
+        // TODO: Избыточная оптимизация
+        /*if (_allUsers.Count == 0)
         {
             labelGlobalUsers.Text = "👥 Пользователей: 0";
             labelGlobalTotal.Text = "💬 Всего сообщ: 0";
             labelGlobalWritten.Text = "✍️ Написано: 0";
             labelGlobalBonus.Text = "🎁 Бонус/Штраф: 0";
             return;
-        }
+        }*/
 
         var totalUsers = _allUsers.Count;
         var totalMessages = (long)_allUsers.Sum(u => (decimal)u.TotalMessageCount);
@@ -320,7 +307,8 @@ public sealed partial class UserStatisticsForm : Form
 
     private void UpdateDetails(UserStatistics? user)
     {
-        if (user == null)
+        // TODO: Не очень: дублирование + хардкод
+        /*if (user == null)
         {
             labelUserId.Text = "🆔 ID: —";
             labelUserName.Text = "👤 Имя: —";
@@ -330,16 +318,16 @@ public sealed partial class UserStatisticsForm : Form
             labelMessagePenalty.Text = "    🚫 Штраф: 0";
             labelChessPiece.Text = "♟ ПЕШКА";
             return;
-        }
+        }*/
 
-        labelUserId.Text = $"🆔 ID: {user.UserId}";
-        labelUserName.Text = $"👤 Имя: {user.Name}";
-        labelMessageTotal.Text = $"💬 Всего: {user.TotalMessageCount:N0}";
-        labelMessageWritten.Text = $"    ✍️ Написано: {user.MessageCount:N0}";
-        labelMessageBonus.Text = $"    🎁 Бонус: {user.BonusMessageCount:N0}";
-        labelMessagePenalty.Text = $"    🚫 Штраф: {user.ShtrafMessageCount:N0}";
+        labelUserId.Text = $"🆔 ID: {user?.UserId ?? "—"}";
+        labelUserName.Text = $"👤 Имя: {user?.Name ?? "—"}";
+        labelMessageTotal.Text = $"💬 Всего: {user?.TotalMessageCount:N0}";
+        labelMessageWritten.Text = $"    ✍️ Написано: {user?.MessageCount:N0}";
+        labelMessageBonus.Text = $"    🎁 Бонус: {user?.BonusMessageCount:N0}";
+        labelMessagePenalty.Text = $"    🚫 Штраф: {user?.ShtrafMessageCount:N0}";
 
-        var rank = _userRankService.GetRank(user.TotalMessageCount);
+        var rank = _userRankService.GetRank(user?.TotalMessageCount ?? 0);
         labelChessPiece.Text = $"{rank.Emoji} {rank.DisplayName}";
     }
 

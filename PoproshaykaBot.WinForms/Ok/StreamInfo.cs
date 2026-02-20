@@ -1,8 +1,6 @@
 namespace PoproshaykaBot.WinForms.Models;
 
-/// <summary>
-/// Описание текущего стрима канала (заголовок, игра, зрители и т.п.).
-/// </summary>
+
 public class StreamInfo
 {
     public string Id { get; set; } = string.Empty;
@@ -18,6 +16,6 @@ public class StreamInfo
     public int ViewerCount { get; set; }
     public DateTime StartedAt { get; set; }
     public string ThumbnailUrl { get; set; } = string.Empty;
-    public IReadOnlyList<string> Tags { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> Tags { get; set; } = [];
     public bool IsMature { get; set; }
 }
