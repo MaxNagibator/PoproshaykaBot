@@ -1,8 +1,7 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using PoproshaykaBot.WinForms.Models;
 using PoproshaykaBot.WinForms.Settings;
-using System.Collections.Concurrent;
-using System.Net;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -19,7 +18,7 @@ public sealed class SseService(SettingsManager settingsManager, ILogger<SseServi
         WriteIndented = false,
     };
 
-    private readonly List<HttpListenerResponse> _sseClients = [];
+    private readonly List<HttpResponse> _sseClients = [];
 
     private readonly Channel<string> _messageChannel = Channel.CreateUnbounded<string>(new()
     {
@@ -29,7 +28,7 @@ public sealed class SseService(SettingsManager settingsManager, ILogger<SseServi
     private CancellationTokenSource? _cts;
     private Task? _broadcastTask;
     private Task? _keepAliveTask;
-    private bool _isRunning;
+    private volatile bool _isRunning;
 
     public void Start()
     {
@@ -51,7 +50,7 @@ public sealed class SseService(SettingsManager settingsManager, ILogger<SseServi
         logger.LogInformation("Сервис SSE успешно запущен. Интервал keep-alive: {KeepAliveSeconds} сек.", keepAliveSeconds);
     }
 
-    public void Stop()
+    public async Task StopAsync()
     {
         logger.LogDebug("Остановка сервиса SSE");
 
@@ -62,38 +61,38 @@ public sealed class SseService(SettingsManager settingsManager, ILogger<SseServi
 
         _isRunning = false;
 
-        _cts?.Cancel();
+        await (_cts?.CancelAsync() ?? Task.CompletedTask);
+
+        try
+        {
+            await Task.WhenAll(_broadcastTask ?? Task.CompletedTask, _keepAliveTask ?? Task.CompletedTask);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         lock (_sseClients)
         {
-            foreach (var client in _sseClients)
-            {
-                try
-                {
-                    client.Close();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Не удалось корректно закрыть соединение SSE клиента при остановке");
-                }
-            }
-
             logger.LogInformation("Отключено {ClientCount} SSE клиентов при остановке сервиса", _sseClients.Count);
             _sseClients.Clear();
         }
     }
 
-    public void AddClient(HttpListenerResponse response)
+    public void RemoveClient(HttpResponse response)
+    {
+        lock (_sseClients)
+        {
+            _sseClients.Remove(response);
+            logger.LogDebug("SSE клиент удалён по завершению соединения. Активных: {Count}", _sseClients.Count);
+        }
+    }
+
+    public void AddClient(HttpResponse response)
     {
         logger.LogDebug("Попытка регистрации нового SSE клиента");
 
         try
         {
-            response.ContentType = "text/event-stream";
-            response.Headers.Add("Cache-Control", "no-cache");
-            response.Headers.Add("Connection", "keep-alive");
-            response.Headers.Add("Access-Control-Allow-Origin", "*");
-
             int clientCount;
             lock (_sseClients)
             {
@@ -162,15 +161,6 @@ public sealed class SseService(SettingsManager settingsManager, ILogger<SseServi
 
             var json = JsonSerializer.Serialize(sseMessage, JsonSerializerOptions);
 
-            lock (_sseClients)
-            {
-                if (_sseClients.Count == 0)
-                {
-                    logger.LogDebug("Нет подключенных SSE клиентов. Уведомление о настройках пропущено");
-                    return;
-                }
-            }
-
             EnqueueMessage(json);
             logger.LogInformation("Уведомление об изменении настроек чата поставлено в очередь на отправку");
         }
@@ -183,19 +173,7 @@ public sealed class SseService(SettingsManager settingsManager, ILogger<SseServi
     public async ValueTask DisposeAsync()
     {
         logger.LogDebug("Освобождение ресурсов сервиса SSE (DisposeAsync)");
-        Stop();
-
-        if (_broadcastTask != null && _keepAliveTask != null)
-        {
-            try
-            {
-                await Task.WhenAll(_broadcastTask, _keepAliveTask).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-
+        await StopAsync();
         _cts?.Dispose();
     }
 
@@ -238,7 +216,7 @@ public sealed class SseService(SettingsManager settingsManager, ILogger<SseServi
                 var payload = isComment ? data + "\n\n" : $"data: {data}\n\n";
                 var buffer = Encoding.UTF8.GetBytes(payload);
 
-                List<HttpListenerResponse> activeClients;
+                List<HttpResponse> activeClients;
                 lock (_sseClients)
                 {
                     if (_sseClients.Count == 0)
@@ -249,47 +227,38 @@ public sealed class SseService(SettingsManager settingsManager, ILogger<SseServi
                     activeClients = _sseClients.ToList();
                 }
 
-                var disconnectedClients = new ConcurrentBag<HttpListenerResponse>();
-
-                var writeTasks = activeClients.Select(async client =>
+                var results = await Task.WhenAll(activeClients.Select(async client =>
                 {
                     try
                     {
-                        await client.OutputStream.WriteAsync(buffer, token);
-                        await client.OutputStream.FlushAsync(token);
+                        await client.Body.WriteAsync(buffer, token);
+                        await client.Body.FlushAsync(token);
+                        return (client, ok: true);
                     }
                     catch (Exception ex)
                     {
                         logger.LogDebug(ex, "Сбой записи в поток SSE. Клиент помечается на удаление");
-                        disconnectedClients.Add(client);
+                        return (client, ok: false);
                     }
-                });
+                }));
 
-                await Task.WhenAll(writeTasks);
+                var disconnected = results.Where(r => !r.ok).Select(r => r.client).ToList();
 
-                if (disconnectedClients.IsEmpty)
+                if (disconnected.Count == 0)
                 {
                     continue;
                 }
 
                 lock (_sseClients)
                 {
-                    foreach (var client in disconnectedClients)
+                    foreach (var client in disconnected)
                     {
                         _sseClients.Remove(client);
-                        try
-                        {
-                            client.Close();
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogDebug(ex, "Ошибка при закрытии потока отключенного клиента");
-                        }
                     }
                 }
 
                 logger.LogInformation("Удалено {DisconnectedCount} отключившихся SSE клиентов. Оставшиеся активные клиенты: {RemainingCount}",
-                    disconnectedClients.Count, _sseClients.Count);
+                    disconnected.Count, _sseClients.Count);
             }
         }
         catch (OperationCanceledException)

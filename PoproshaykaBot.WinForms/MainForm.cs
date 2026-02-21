@@ -11,7 +11,7 @@ public partial class MainForm : Form
     private readonly ChatHistoryManager _chatHistoryManager;
     private readonly SettingsManager _settingsManager;
     private readonly BotConnectionManager _connectionManager;
-    private readonly UnifiedHttpServer _httpServer;
+    private readonly KestrelHttpServer _httpServer;
     private readonly TwitchOAuthService _oauthService;
     private readonly StatisticsCollector _statisticsCollector;
     private readonly UserRankService _userRankService;
@@ -25,7 +25,7 @@ public partial class MainForm : Form
 
     public MainForm(
         ChatHistoryManager chatHistoryManager,
-        UnifiedHttpServer httpServer,
+        KestrelHttpServer httpServer,
         BotConnectionManager connectionManager,
         SettingsManager settingsManager,
         TwitchOAuthService oauthService,
@@ -120,17 +120,14 @@ public partial class MainForm : Form
         _connectionManager.ProgressChanged -= OnConnectionProgress;
         _connectionManager.ConnectionCompleted -= OnConnectionCompleted;
 
-        if (_httpServer != null)
+        try
         {
-            try
-            {
-                _httpServer.LogMessage -= OnHttpServerLogMessage;
-                _settingsManager.ChatSettingsChanged -= _httpServer.NotifyChatSettingsChanged;
-            }
-            catch (Exception ex)
-            {
-                AddLogMessage($"Ошибка остановки HTTP сервера: {ex.Message}");
-            }
+            _httpServer.LogMessage -= OnHttpServerLogMessage;
+            _settingsManager.ChatSettingsChanged -= _httpServer.NotifyChatSettingsChanged;
+        }
+        catch (Exception ex)
+        {
+            AddLogMessage($"Ошибка остановки HTTP сервера: {ex.Message}");
         }
 
         base.OnFormClosing(e);
@@ -195,17 +192,6 @@ public partial class MainForm : Form
             UpdateStreamStatus();
             AddLogMessage("Бот успешно подключен!");
         }
-    }
-
-    private void OnBotConnectionProgress(string message)
-    {
-        if (InvokeRequired)
-        {
-            Invoke(new Action<string>(OnBotConnectionProgress), message);
-            return;
-        }
-
-        _connectionStatusLabel.Text = message;
     }
 
     private void OnBotConnected(string message)
@@ -295,6 +281,17 @@ public partial class MainForm : Form
             await _streamStatusManager.RefreshCurrentStatusAsync();
             UpdateStreamInfo();
         }
+    }
+
+    private void OnBotConnectionProgress(string message)
+    {
+        if (InvokeRequired)
+        {
+            Invoke(new Action<string>(OnBotConnectionProgress), message);
+            return;
+        }
+
+        _connectionStatusLabel.Text = message;
     }
 
     private void OnStreamStatusChanged()
@@ -543,7 +540,7 @@ public partial class MainForm : Form
 
         if (_logTextBox.Lines.Length > MaxLogLines)
         {
-            int charIndex = _logTextBox.GetFirstCharIndexFromLine(_logTextBox.Lines.Length - MaxLogLines);
+            var charIndex = _logTextBox.GetFirstCharIndexFromLine(_logTextBox.Lines.Length - MaxLogLines);
             if (charIndex > 0)
             {
                 _logTextBox.Select(0, charIndex);

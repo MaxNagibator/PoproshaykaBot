@@ -4,7 +4,6 @@ using PoproshaykaBot.WinForms.Broadcast;
 using PoproshaykaBot.WinForms.Chat;
 using PoproshaykaBot.WinForms.Chat.Commands;
 using PoproshaykaBot.WinForms.Services.Http;
-using PoproshaykaBot.WinForms.Services.Http.Handlers;
 using PoproshaykaBot.WinForms.Settings;
 using Serilog;
 using System.Diagnostics;
@@ -101,8 +100,8 @@ public static class Program
                     {
                         try
                         {
-                            var httpServer = serviceProvider.GetRequiredService<UnifiedHttpServer>();
-                            httpServer.StartAsync().GetAwaiter().GetResult();
+                            var httpServer = serviceProvider.GetRequiredService<KestrelHttpServer>();
+                            Task.Run(() => httpServer.StartAsync()).GetAwaiter().GetResult();
                             Log.Information("HTTP сервер успешно запущен.");
                         }
                         catch (Exception ex)
@@ -177,43 +176,8 @@ public static class Program
         services.AddSingleton<TwitchOAuthService>();
         services.AddSingleton<ChatHistoryManager>();
         services.AddSingleton<SseService>();
-        services.AddSingleton<OAuthHandler>();
-        services.AddSingleton<OverlayHandler>();
-        services.AddSingleton<SseHandler>();
-        services.AddSingleton<ApiHistoryHandler>();
-        services.AddSingleton<ApiChatSettingsHandler>();
 
-        services.AddSingleton<Router>(sp =>
-        {
-            var oauth = sp.GetRequiredService<OAuthHandler>();
-            var overlay = sp.GetRequiredService<OverlayHandler>();
-            var sse = sp.GetRequiredService<SseHandler>();
-            var apiHistory = sp.GetRequiredService<ApiHistoryHandler>();
-            var apiSettings = sp.GetRequiredService<ApiChatSettingsHandler>();
-
-            var router = new Router();
-            router.Register("/", oauth);
-            router.Register("/chat", overlay);
-            router.Register("/events", sse);
-            router.Register("/api/history", apiHistory);
-            router.Register("/api/chat-settings", apiSettings);
-
-            router.Register("/assets/obs.css", new StaticContentHandler("PoproshaykaBot.WinForms.Assets.obs.css", "text/css; charset=utf-8"));
-            router.Register("/assets/obs.js", new StaticContentHandler("PoproshaykaBot.WinForms.Assets.obs.js", "application/javascript; charset=utf-8"));
-            router.Register("/favicon.ico", new StaticContentHandler("PoproshaykaBot.WinForms.icon.ico", "image/x-icon"));
-
-            return router;
-        });
-
-        services.AddSingleton<UnifiedHttpServer>(sp =>
-        {
-            var settings = sp.GetRequiredService<SettingsManager>();
-            var history = sp.GetRequiredService<ChatHistoryManager>();
-            var router = sp.GetRequiredService<Router>();
-            var sseService = sp.GetRequiredService<SseService>();
-
-            return new(history, router, sseService, settings.Current.Twitch.HttpServerPort);
-        });
+        services.AddSingleton<KestrelHttpServer>();
 
         services.AddSingleton<EventSubWebsocketClient>();
         services.AddSingleton<StreamStatusManager>();
