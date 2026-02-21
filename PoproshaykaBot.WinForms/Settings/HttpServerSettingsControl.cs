@@ -3,9 +3,9 @@
 public partial class HttpServerSettingsControl : UserControl
 {
     private static readonly TwitchSettings DefaultSettings = new();
-    private readonly UnifiedHttpServer _server;
+    private readonly KestrelHttpServer _server;
 
-    public HttpServerSettingsControl(UnifiedHttpServer server)
+    public HttpServerSettingsControl(KestrelHttpServer server)
     {
         InitializeComponent();
         SetPlaceholders();

@@ -8,7 +8,7 @@ public partial class SettingsForm : Form
     private AppSettings _settings;
     private bool _hasChanges;
 
-    public SettingsForm(SettingsManager settingsManager, TwitchOAuthService oauthService, UnifiedHttpServer httpServer)
+    public SettingsForm(SettingsManager settingsManager, TwitchOAuthService oauthService, KestrelHttpServer httpServer)
     {
         _settingsManager = settingsManager;
         _settings = new();
