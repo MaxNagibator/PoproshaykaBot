@@ -35,7 +35,7 @@ public class SettingsManager
         {
             lock (_syncLock)
             {
-                return _currentSettings ?? LoadSettingsInternal();
+                return _currentSettings ??= LoadSettingsInternal();
             }
         }
     }

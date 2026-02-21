@@ -222,26 +222,7 @@ public static class Program
         services.AddSingleton<UserMessagesManagementService>();
 
         services.AddSingleton<TwitchChatMessenger>();
-        services.AddSingleton<BroadcastScheduler>(sp =>
-        {
-            var messenger = sp.GetRequiredService<TwitchChatMessenger>();
-            var settingsManager = sp.GetRequiredService<SettingsManager>();
-            var streamStatusManager = sp.GetRequiredService<StreamStatusManager>();
-
-            var messageProvider = new Func<int, string>(counter =>
-            {
-                var template = settingsManager.Current.Twitch.AutoBroadcast.BroadcastMessageTemplate;
-                var info = streamStatusManager.CurrentStream;
-
-                return template
-                    .Replace("{counter}", counter.ToString())
-                    .Replace("{title}", info?.Title ?? string.Empty)
-                    .Replace("{game}", info?.GameName ?? string.Empty)
-                    .Replace("{viewers}", info?.ViewerCount.ToString() ?? string.Empty);
-            });
-
-            return new(messenger, settingsManager, messageProvider);
-        });
+        services.AddSingleton<BroadcastScheduler>();
 
         services.AddSingleton<AudienceTracker>();
 
