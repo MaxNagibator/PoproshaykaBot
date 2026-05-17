@@ -45,6 +45,8 @@ partial class SettingsForm
         _oauthSettingsControl = new OAuthSettingsControl();
         _obsChatTabPage = new TabPage();
         _obsChatSettingsControl = new ObsChatSettingsControl();
+        _obsIntegrationTabPage = new TabPage();
+        _obsIntegrationSettingsControl = new ObsIntegrationSettingsControl();
         _autoBroadcastTabPage = new TabPage();
         _autoBroadcastSettingsControl = new AutoBroadcastSettingsControl();
         _botLifecycleAutomationTabPage = new TabPage();
@@ -70,6 +72,7 @@ partial class SettingsForm
         _messagesTabPage.SuspendLayout();
         _oauthTabPage.SuspendLayout();
         _obsChatTabPage.SuspendLayout();
+        _obsIntegrationTabPage.SuspendLayout();
         _autoBroadcastTabPage.SuspendLayout();
         _botLifecycleAutomationTabPage.SuspendLayout();
         _pollsTabPage.SuspendLayout();
@@ -100,6 +103,7 @@ partial class SettingsForm
         _tabControl.Controls.Add(_messagesTabPage);
         _tabControl.Controls.Add(_oauthTabPage);
         _tabControl.Controls.Add(_obsChatTabPage);
+        _tabControl.Controls.Add(_obsIntegrationTabPage);
         _tabControl.Controls.Add(_autoBroadcastTabPage);
         _tabControl.Controls.Add(_botLifecycleAutomationTabPage);
         _tabControl.Controls.Add(_pollsTabPage);
@@ -267,6 +271,27 @@ partial class SettingsForm
         _obsChatSettingsControl.Size = new Size(593, 529);
         _obsChatSettingsControl.TabIndex = 0;
         _obsChatSettingsControl.SettingChanged += OnSettingChanged;
+        //
+        // _obsIntegrationTabPage
+        //
+        _obsIntegrationTabPage.Controls.Add(_obsIntegrationSettingsControl);
+        _obsIntegrationTabPage.Location = new Point(4, 24);
+        _obsIntegrationTabPage.Name = "_obsIntegrationTabPage";
+        _obsIntegrationTabPage.Padding = new Padding(10, 10, 10, 10);
+        _obsIntegrationTabPage.Size = new Size(613, 549);
+        _obsIntegrationTabPage.TabIndex = 11;
+        _obsIntegrationTabPage.Text = "OBS подключение";
+        _obsIntegrationTabPage.UseVisualStyleBackColor = true;
+        //
+        // _obsIntegrationSettingsControl
+        //
+        _obsIntegrationSettingsControl.Dock = DockStyle.Fill;
+        _obsIntegrationSettingsControl.Location = new Point(10, 10);
+        _obsIntegrationSettingsControl.Margin = new Padding(6, 7, 6, 7);
+        _obsIntegrationSettingsControl.Name = "_obsIntegrationSettingsControl";
+        _obsIntegrationSettingsControl.Size = new Size(593, 529);
+        _obsIntegrationSettingsControl.TabIndex = 0;
+        _obsIntegrationSettingsControl.SettingChanged += OnSettingChanged;
         //
         // _autoBroadcastTabPage
         // 
@@ -459,6 +484,7 @@ partial class SettingsForm
         _messagesTabPage.ResumeLayout(false);
         _oauthTabPage.ResumeLayout(false);
         _obsChatTabPage.ResumeLayout(false);
+        _obsIntegrationTabPage.ResumeLayout(false);
         _autoBroadcastTabPage.ResumeLayout(false);
         _botLifecycleAutomationTabPage.ResumeLayout(false);
         _pollsTabPage.ResumeLayout(false);
@@ -480,6 +506,7 @@ partial class SettingsForm
     private TabPage _messagesTabPage;
     private TabPage _oauthTabPage;
     private TabPage _obsChatTabPage;
+    private TabPage _obsIntegrationTabPage;
     private TabPage _autoBroadcastTabPage;
     private TabPage _botLifecycleAutomationTabPage;
     private TabPage _miscTabPage;
@@ -489,6 +516,7 @@ partial class SettingsForm
     private HttpServerSettingsControl _httpServerSettingsControl;
     private OAuthSettingsControl _oauthSettingsControl;
     private ObsChatSettingsControl _obsChatSettingsControl;
+    private ObsIntegrationSettingsControl _obsIntegrationSettingsControl;
     private AutoBroadcastSettingsControl _autoBroadcastSettingsControl;
     private BotLifecycleAutomationSettingsControl _botLifecycleAutomationSettingsControl;
     private MiscSettingsControl _miscSettingsControl;

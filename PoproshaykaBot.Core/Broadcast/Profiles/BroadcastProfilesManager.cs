@@ -58,6 +58,7 @@ public class BroadcastProfilesManager(
                 GameName = profile.GameName,
                 BroadcasterLanguage = profile.BroadcasterLanguage,
                 Tags = profile.Tags.ToList(),
+                ObsSceneName = profile.ObsSceneName,
                 CurrentNumber = profile.CurrentNumber,
                 LastApplyAt = profile.LastApplyAt,
                 LastAutoAdvanceAt = profile.LastAutoAdvanceAt,
@@ -67,6 +68,8 @@ public class BroadcastProfilesManager(
         {
             profileToApply = profile;
         }
+
+        _ = eventBus.PublishAsync(new BroadcastProfileApplying(profileToApply));
 
         var success = await applier.ApplyAsync(profileToApply, cancellationToken);
 
@@ -160,6 +163,18 @@ public class BroadcastProfilesManager(
             if (duplicate != null)
             {
                 throw new InvalidOperationException($"Профиль с именем '{profile.Name}' уже существует");
+            }
+
+            if (!string.IsNullOrWhiteSpace(profile.ObsSceneName))
+            {
+                var sceneDuplicate = profiles.FirstOrDefault(p =>
+                    p.Id != profile.Id
+                    && string.Equals(p.ObsSceneName.Trim(), profile.ObsSceneName.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                if (sceneDuplicate != null)
+                {
+                    throw new InvalidOperationException($"Сцена OBS «{profile.ObsSceneName.Trim()}» уже привязана к профилю «{sceneDuplicate.Name}»");
+                }
             }
 
             var existing = profiles.FirstOrDefault(p => p.Id == profile.Id);

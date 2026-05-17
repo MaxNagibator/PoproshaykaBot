@@ -12,6 +12,7 @@ using PoproshaykaBot.Core.Streaming;
 using PoproshaykaBot.Core.Twitch.Auth;
 using PoproshaykaBot.WinForms.Forms.Onboarding;
 using PoproshaykaBot.WinForms.Forms.Settings;
+using PoproshaykaBot.WinForms.Forms.StreamHistory;
 using PoproshaykaBot.WinForms.Forms.Users;
 using PoproshaykaBot.WinForms.Infrastructure.Di;
 
@@ -34,6 +35,7 @@ public partial class MainForm : Form
     private bool _initialized;
     private bool _onboardingWizardOpen;
     private UserStatisticsForm? _userStatisticsForm;
+    private StreamHistoryForm? _streamHistoryForm;
     private SettingsForm? _settingsForm;
     private StreamMonitoringStatus? _botMonitoringStatus;
     private StreamMonitoringStatus? _broadcasterMonitoringStatus;
@@ -115,6 +117,10 @@ public partial class MainForm : Form
         {
             case Keys.Alt | Keys.U:
                 OnOpenUserStatistics();
+                return true;
+
+            case Keys.Alt | Keys.H:
+                OnOpenStreamHistory();
                 return true;
 
             case Keys.Control | Keys.Shift | Keys.Delete:
@@ -199,6 +205,11 @@ public partial class MainForm : Form
     private void OnUserStatisticsButtonClicked(object? sender, EventArgs e)
     {
         OnOpenUserStatistics();
+    }
+
+    private void OnStreamHistoryButtonClicked(object? sender, EventArgs e)
+    {
+        OnOpenStreamHistory();
     }
 
     private static string GetDisplayVersion()
@@ -289,6 +300,12 @@ public partial class MainForm : Form
             {
                 _userStatisticsForm.Close();
                 _userStatisticsForm = null;
+            }
+
+            if (_streamHistoryForm is { IsDisposed: false })
+            {
+                _streamHistoryForm.Close();
+                _streamHistoryForm = null;
             }
 
             if (_settingsForm is { IsDisposed: false })
@@ -435,6 +452,19 @@ public partial class MainForm : Form
         else
         {
             _userStatisticsForm.Focus();
+        }
+    }
+
+    private void OnOpenStreamHistory()
+    {
+        if (_streamHistoryForm == null || _streamHistoryForm.IsDisposed)
+        {
+            _streamHistoryForm = _forms.Create<StreamHistoryForm>();
+            _streamHistoryForm.Show(this);
+        }
+        else
+        {
+            _streamHistoryForm.Focus();
         }
     }
 

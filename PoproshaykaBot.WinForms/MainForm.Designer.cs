@@ -41,6 +41,7 @@ partial class MainForm
         _connectToolStripButton = new ToolStripButton();
         _settingsToolStripButton = new ToolStripButton();
         _statsToolStripButton = new ToolStripButton();
+        _streamHistoryToolStripButton = new ToolStripButton();
         _dashboardControl = new DashboardControl();
         _connectionProgressBar = new ToolStripProgressBar();
         _connectionStatusLabel = new ToolStripStatusLabel();
@@ -113,7 +114,7 @@ partial class MainForm
         _mainToolStrip.Dock = DockStyle.Fill;
         _mainToolStrip.GripStyle = ToolStripGripStyle.Hidden;
         _mainToolStrip.ImageScalingSize = new Size(24, 24);
-        _mainToolStrip.Items.AddRange(new ToolStripItem[] { _connectToolStripButton, _settingsToolStripButton, _statsToolStripButton });
+        _mainToolStrip.Items.AddRange(new ToolStripItem[] { _connectToolStripButton, _settingsToolStripButton, _statsToolStripButton, _streamHistoryToolStripButton });
         _mainToolStrip.Location = new Point(12, 12);
         _mainToolStrip.Name = "_mainToolStrip";
         _mainToolStrip.Padding = new Padding(5, 0, 5, 0);
@@ -146,7 +147,16 @@ partial class MainForm
         _statsToolStripButton.Text = "📊 Статистика";
         _statsToolStripButton.ToolTipText = "Открыть окно статистики (Alt+U)";
         _statsToolStripButton.Click += OnUserStatisticsButtonClicked;
-        // 
+        //
+        // _streamHistoryToolStripButton
+        //
+        _streamHistoryToolStripButton.DisplayStyle = ToolStripItemDisplayStyle.Text;
+        _streamHistoryToolStripButton.Name = "_streamHistoryToolStripButton";
+        _streamHistoryToolStripButton.Size = new Size(120, 37);
+        _streamHistoryToolStripButton.Text = "🎬 История стримов";
+        _streamHistoryToolStripButton.ToolTipText = "Открыть историю стримов (Alt+H)";
+        _streamHistoryToolStripButton.Click += OnStreamHistoryButtonClicked;
+        //
         // _dashboardControl
         // 
         _dashboardControl.Dock = DockStyle.Fill;
@@ -219,6 +229,7 @@ partial class MainForm
     private ToolStripButton _connectToolStripButton;
     private ToolStripButton _settingsToolStripButton;
     private ToolStripButton _statsToolStripButton;
+    private ToolStripButton _streamHistoryToolStripButton;
     private DashboardControl _dashboardControl;
     private ToolStripProgressBar _connectionProgressBar;
     private ToolStripStatusLabel _connectionStatusLabel;

@@ -1,4 +1,4 @@
-using PoproshaykaBot.Core.Broadcast.Profiles;
+﻿using PoproshaykaBot.Core.Broadcast.Profiles;
 using PoproshaykaBot.Core.Streaming;
 
 namespace PoproshaykaBot.WinForms.Forms.Broadcast;
@@ -65,6 +65,20 @@ internal sealed class BroadcastProfileCardsView
         finally
         {
             _cardsFlow.ResumeLayout();
+        }
+    }
+
+    public void SetApplyInFlight(Guid profileId)
+    {
+        foreach (var control in _cardsFlow.Controls)
+        {
+            if (control is not BroadcastProfileCard card || card.Profile?.Id != profileId)
+            {
+                continue;
+            }
+
+            card.SetApplyInFlight(true);
+            return;
         }
     }
 

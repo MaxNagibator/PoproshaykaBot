@@ -262,6 +262,7 @@ internal sealed class BroadcastProfileActionCoordinator(
             GameName = source.GameName,
             BroadcasterLanguage = source.BroadcasterLanguage,
             Tags = source.Tags.ToList(),
+            ObsSceneName = source.ObsSceneName,
             CurrentNumber = source.CurrentNumber,
             LastApplyAt = source.LastApplyAt,
             LastAutoAdvanceAt = source.LastAutoAdvanceAt,

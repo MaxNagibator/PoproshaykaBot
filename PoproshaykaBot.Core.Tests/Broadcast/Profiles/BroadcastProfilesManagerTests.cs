@@ -82,6 +82,70 @@ public class BroadcastProfilesManagerTests
     }
 
     [Test]
+    public void Upsert_DuplicateObsScene_Throws()
+    {
+        _manager.Upsert(new()
+        {
+            Name = "A",
+            ObsSceneName = "Игра",
+        });
+
+        Assert.Throws<InvalidOperationException>(() =>
+            _manager.Upsert(new()
+            {
+                Name = "B",
+                ObsSceneName = "игра",
+            }));
+    }
+
+    [Test]
+    public void Upsert_EmptyObsScene_NoUniquenessConflict()
+    {
+        var profile = new BroadcastProfile
+        {
+            Name = "A",
+            ObsSceneName = string.Empty,
+        };
+
+        _manager.Upsert(profile);
+
+        Assert.DoesNotThrow(() =>
+        {
+            var broadcastProfile = new BroadcastProfile
+            {
+                Name = "B",
+                ObsSceneName = string.Empty,
+            };
+
+            _manager.Upsert(broadcastProfile);
+        });
+    }
+
+    [Test]
+    public async Task ApplyAsync_PlaceholderTitle_PreservesObsSceneNameInEvent()
+    {
+        BroadcastProfile? captured = null;
+        _applier.ApplyAsync(Arg.Do<BroadcastProfile>(p => captured = p), Arg.Any<CancellationToken>()).Returns(true);
+        var profile = new BroadcastProfile
+        {
+            Name = "X",
+            Title = "Серия #{n}",
+            CurrentNumber = 7,
+            ObsSceneName = "Игра",
+        };
+
+        _manager.Upsert(profile);
+        await _manager.ApplyAsync(profile.Id, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(captured, Is.Not.Null);
+            Assert.That(captured!.Title, Is.EqualTo("Серия #7"));
+            Assert.That(captured.ObsSceneName, Is.EqualTo("Игра"));
+        }
+    }
+
+    [Test]
     public void Upsert_SameProfileEdited_Succeeds()
     {
         var profile = new BroadcastProfile

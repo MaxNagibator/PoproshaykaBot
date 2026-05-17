@@ -72,6 +72,11 @@ public sealed partial class BroadcastProfileCard : UserControl
             parts.Add(string.Join(" ", profile.Tags.Select(t => "#" + t)));
         }
 
+        if (!string.IsNullOrWhiteSpace(profile.ObsSceneName))
+        {
+            parts.Add("🎬 " + profile.ObsSceneName);
+        }
+
         if (!string.IsNullOrWhiteSpace(profile.BroadcasterLanguage))
         {
             parts.Add(profile.BroadcasterLanguage.ToUpperInvariant());

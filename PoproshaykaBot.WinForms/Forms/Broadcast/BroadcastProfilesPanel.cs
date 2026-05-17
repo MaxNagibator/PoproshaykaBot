@@ -103,6 +103,7 @@ public partial class BroadcastProfilesPanel : UserControl, IDashboardTileHeaderP
         _cards.DecrementNumberRequested += async (_, card) => await _actions.AdjustNumberAsync(card, -1);
 
         _subs.Add(Bus.SubscribeOnUi<BroadcastProfilesChanged>(this, _ => ReloadCards()));
+        _subs.Add(Bus.SubscribeOnUi<BroadcastProfileApplying>(this, OnProfileApplying));
         _subs.Add(Bus.SubscribeOnUi<BroadcastProfileApplied>(this, OnProfileApplied));
         _subs.Add(Bus.SubscribeOnUi<BroadcastProfileApplyFailed>(this, OnProfileApplyFailed));
         _subs.Add(Bus.SubscribeOnUi<ChannelInformationPatched>(this, OnChannelInformationPatched));
@@ -137,6 +138,12 @@ public partial class BroadcastProfilesPanel : UserControl, IDashboardTileHeaderP
                 _editCurrentButton.Enabled = !busy;
             }
         });
+    }
+
+    private void OnProfileApplying(BroadcastProfileApplying @event)
+    {
+        _cards.SetApplyInFlight(@event.Profile.Id);
+        _status.Show($"⏳ Применяется «{@event.Profile.Name}»…", false);
     }
 
     private void OnProfileApplied(BroadcastProfileApplied @event)

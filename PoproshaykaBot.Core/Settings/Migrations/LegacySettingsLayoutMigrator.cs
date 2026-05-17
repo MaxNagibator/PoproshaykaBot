@@ -15,6 +15,7 @@ public static class LegacySettingsLayoutMigrator
         "broadcast-profiles.json",
         "polls.json",
         "obs-chat.json",
+        "obs-integration.json",
         "recent-categories.json",
         "dashboard-layout.json",
     ];

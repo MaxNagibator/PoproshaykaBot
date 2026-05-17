@@ -4,6 +4,7 @@ using PoproshaykaBot.WinForms.Forms.Broadcast;
 using PoproshaykaBot.WinForms.Forms.Onboarding;
 using PoproshaykaBot.WinForms.Forms.Polls;
 using PoproshaykaBot.WinForms.Forms.Settings;
+using PoproshaykaBot.WinForms.Forms.StreamHistory;
 using PoproshaykaBot.WinForms.Forms.Users;
 using PoproshaykaBot.WinForms.Tiles;
 
@@ -14,6 +15,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddDashboardTiles(this IServiceCollection services)
     {
         services.AddSingleton<DashboardTileType, StreamInfoTileType>();
+        services.AddSingleton<DashboardTileType, ObsInfoTileType>();
         services.AddSingleton<DashboardTileType, BroadcastStatusTileType>();
         services.AddSingleton<DashboardTileType, LogsTileType>();
         services.AddSingleton<DashboardTileType, TwitchChatTileType>();
@@ -34,6 +36,7 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<SettingsForm>();
         services.AddTransient<UserStatisticsForm>();
+        services.AddTransient<StreamHistoryForm>();
         services.AddTransient<BroadcastProfileEditDialog>();
         services.AddTransient<PollFromProfileDialog>();
         services.AddTransient<PollProfileEditDialog>();

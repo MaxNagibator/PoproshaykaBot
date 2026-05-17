@@ -3,8 +3,10 @@ using PoproshaykaBot.Core.Chat;
 using PoproshaykaBot.Core.Chat.Commands;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Chat;
+using PoproshaykaBot.Core.Infrastructure.Events.Statistics;
 using PoproshaykaBot.Core.Infrastructure.Events.Streaming;
 using PoproshaykaBot.Core.Settings;
+using PoproshaykaBot.Core.Statistics;
 using PoproshaykaBot.Core.Streaming;
 
 namespace PoproshaykaBot.Core.Broadcast;
@@ -25,6 +27,7 @@ public sealed class StreamSessionStatisticsHandler :
     private readonly IStreamStatus _streamStatus;
     private readonly SettingsManager _settingsManager;
     private readonly TimeProvider _timeProvider;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<StreamSessionStatisticsHandler> _logger;
     private readonly IDisposable _onlineSubscription;
     private readonly IDisposable _offlineSubscription;
@@ -33,7 +36,7 @@ public sealed class StreamSessionStatisticsHandler :
     private readonly IDisposable _channelUpdatedSubscription;
 
     private readonly object _stateLock = new();
-    private readonly HashSet<string> _chatters = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ChatterTally> _chatters = new(StringComparer.Ordinal);
     private DateTimeOffset? _sessionStartedAt;
     private long _messageCount;
     private int _peakViewers;
@@ -57,6 +60,7 @@ public sealed class StreamSessionStatisticsHandler :
         _streamStatus = streamStatus;
         _settingsManager = settingsManager;
         _timeProvider = timeProvider;
+        _eventBus = eventBus;
         _logger = logger;
 
         _onlineSubscription = eventBus.Subscribe<StreamWentOnline>(this);
@@ -111,7 +115,20 @@ public sealed class StreamSessionStatisticsHandler :
 
             if (!string.IsNullOrEmpty(@event.UserId))
             {
-                _chatters.Add(@event.UserId);
+                if (!_chatters.TryGetValue(@event.UserId, out var tally))
+                {
+                    tally = new();
+                    _chatters[@event.UserId] = tally;
+                }
+
+                tally.MessageCount++;
+
+                var displayName = FirstNonEmpty(@event.DisplayName, @event.Username);
+
+                if (displayName != null)
+                {
+                    tally.DisplayName = displayName;
+                }
             }
         }
 
@@ -185,6 +202,7 @@ public sealed class StreamSessionStatisticsHandler :
         int avgViewers;
         string? lastTitle;
         string? lastGame;
+        List<StreamSessionChatter> chatters;
 
         lock (_stateLock)
         {
@@ -199,6 +217,17 @@ public sealed class StreamSessionStatisticsHandler :
             lastTitle = _lastTitle;
             lastGame = _lastGame;
 
+            chatters = _chatters
+                .Select(pair => new StreamSessionChatter
+                {
+                    UserId = pair.Key,
+                    DisplayName = string.IsNullOrEmpty(pair.Value.DisplayName) ? pair.Key : pair.Value.DisplayName,
+                    MessageCount = pair.Value.MessageCount,
+                })
+                .OrderByDescending(chatter => chatter.MessageCount)
+                .ThenBy(chatter => chatter.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
             _sessionStartedAt = null;
             _messageCount = 0;
             _chatters.Clear();
@@ -211,9 +240,41 @@ public sealed class StreamSessionStatisticsHandler :
 
         if (sessionStartedAt == null)
         {
-            _logger.LogDebug("Офлайн без активной сессии — статистика не отправляется");
+            _logger.LogDebug("Офлайн без активной сессии — статистика не сохраняется");
             return;
         }
+
+        var endedAt = _timeProvider.GetUtcNow();
+        var duration = endedAt - sessionStartedAt.Value;
+
+        if (duration < TimeSpan.Zero)
+        {
+            duration = TimeSpan.Zero;
+        }
+
+        var record = new StreamSessionRecord
+        {
+            Channel = @event.Channel,
+            StartedAt = sessionStartedAt.Value,
+            EndedAt = endedAt,
+            Title = lastTitle,
+            Game = lastGame,
+            MessageCount = messageCount,
+            ChatterCount = chatterCount,
+            PeakViewers = peakViewers,
+            AverageViewers = avgViewers,
+            Chatters = chatters,
+        };
+
+        await _eventBus.PublishAsync(new StreamSessionCompleted(record), cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation("Сессия стрима канала {Channel} завершена и сохранена: длительность {Duration}, сообщений {Messages}, чаттеров {Chatters}, пик {Peak}, средний {Avg}",
+            @event.Channel,
+            duration,
+            messageCount,
+            chatterCount,
+            peakViewers,
+            avgViewers);
 
         var settings = _settingsManager.Current.Twitch.AutoBroadcast;
 
@@ -221,13 +282,6 @@ public sealed class StreamSessionStatisticsHandler :
             || string.IsNullOrWhiteSpace(settings.StreamEndStatsMessage))
         {
             return;
-        }
-
-        var duration = _timeProvider.GetUtcNow() - sessionStartedAt.Value;
-
-        if (duration < TimeSpan.Zero)
-        {
-            duration = TimeSpan.Zero;
         }
 
         var message = MessageTemplate.For(settings.StreamEndStatsMessage)
@@ -276,16 +330,20 @@ public sealed class StreamSessionStatisticsHandler :
         return string.IsNullOrEmpty(value) ? null : value;
     }
 
+    private static string? FirstNonEmpty(string? primary, string? fallback)
+    {
+        return NullIfEmpty(primary) ?? NullIfEmpty(fallback);
+    }
+
     private void StartSamplingLoop()
     {
-        var newCts = new CancellationTokenSource();
-        var token = newCts.Token;
-        var newTask = Task.Run(() => RunSamplingLoopAsync(token), token);
-
         lock (_stateLock)
         {
+            var newCts = new CancellationTokenSource();
+            var token = newCts.Token;
+            _samplingCts?.Dispose();
             _samplingCts = newCts;
-            _samplingTask = newTask;
+            _samplingTask = Task.Run(() => RunSamplingLoopAsync(token), token);
         }
     }
 
@@ -384,5 +442,11 @@ public sealed class StreamSessionStatisticsHandler :
                 _lastGame = snapshot.GameName;
             }
         }
+    }
+
+    private sealed class ChatterTally
+    {
+        public string DisplayName { get; set; } = string.Empty;
+        public long MessageCount { get; set; }
     }
 }

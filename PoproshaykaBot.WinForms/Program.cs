@@ -6,6 +6,7 @@ using PoproshaykaBot.Core.Infrastructure.Di;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Hosting;
 using PoproshaykaBot.Core.Infrastructure.Logging;
+using PoproshaykaBot.Core.Obs;
 using PoproshaykaBot.Core.Polls;
 using PoproshaykaBot.Core.Server;
 using PoproshaykaBot.Core.Settings;
@@ -271,6 +272,7 @@ public static class Program
             .AddBroadcasting()
             .AddPolls()
             .AddHttpServer()
+            .AddObsIntegration()
             .AddDashboardTiles()
             .AddForms();
     }

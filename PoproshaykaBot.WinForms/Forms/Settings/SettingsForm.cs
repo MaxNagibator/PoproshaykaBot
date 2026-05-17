@@ -17,6 +17,7 @@ public partial class SettingsForm : Form
     private readonly SettingsManager _settingsManager;
     private readonly AccountsStore _accountsStore;
     private readonly ObsChatStore _obsChatStore;
+    private readonly ObsIntegrationStore _obsIntegrationStore;
     private readonly DashboardLayoutStore _dashboardLayoutStore;
     private readonly PollsStore _pollsStore;
     private readonly IEventBus _eventBus;
@@ -27,6 +28,7 @@ public partial class SettingsForm : Form
     private TwitchAccountSettings _botDraft;
     private TwitchAccountSettings _broadcasterDraft;
     private ObsChatSettings _obsChatDraft;
+    private ObsIntegrationSettings _obsIntegrationDraft;
     private PollsSettings _pollsDraft;
     private DashboardLayoutSettings? _dashboardDraft;
     private bool _initialized;
@@ -36,6 +38,7 @@ public partial class SettingsForm : Form
         SettingsManager settingsManager,
         AccountsStore accountsStore,
         ObsChatStore obsChatStore,
+        ObsIntegrationStore obsIntegrationStore,
         DashboardLayoutStore dashboardLayoutStore,
         PollsStore pollsStore,
         IEventBus eventBus,
@@ -45,6 +48,7 @@ public partial class SettingsForm : Form
         _settingsManager = settingsManager;
         _accountsStore = accountsStore;
         _obsChatStore = obsChatStore;
+        _obsIntegrationStore = obsIntegrationStore;
         _dashboardLayoutStore = dashboardLayoutStore;
         _pollsStore = pollsStore;
         _eventBus = eventBus;
@@ -55,6 +59,7 @@ public partial class SettingsForm : Form
         _botDraft = JsonStoreClone.DeepClone(accountsStore.LoadBot());
         _broadcasterDraft = JsonStoreClone.DeepClone(accountsStore.LoadBroadcaster());
         _obsChatDraft = JsonStoreClone.DeepClone(obsChatStore.Load());
+        _obsIntegrationDraft = JsonStoreClone.DeepClone(obsIntegrationStore.Load());
         _pollsDraft = JsonStoreClone.DeepClone(pollsStore.Load());
         _dashboardDraft = JsonStoreClone.DeepCloneNullable(dashboardLayoutStore.LoadDashboard());
 
@@ -77,6 +82,8 @@ public partial class SettingsForm : Form
                 () => _oauthSettingsControl.SaveSettings(_settings)),
             new(() => _obsChatSettingsControl.LoadSettings(_obsChatDraft),
                 () => _obsChatSettingsControl.SaveSettings(_obsChatDraft)),
+            new(() => _obsIntegrationSettingsControl.LoadSettings(_obsIntegrationDraft, _settings.Twitch.HttpServerPort),
+                () => _obsIntegrationSettingsControl.SaveSettings(_obsIntegrationDraft)),
             new(() => _autoBroadcastSettingsControl.LoadSettings(_settings.Twitch.AutoBroadcast),
                 () => _autoBroadcastSettingsControl.SaveSettings(_settings.Twitch.AutoBroadcast)),
             new(() => _botLifecycleAutomationSettingsControl.LoadSettings(_settings.Twitch.BotLifecycleAutomation),
@@ -189,6 +196,7 @@ public partial class SettingsForm : Form
         _botDraft = new();
         _broadcasterDraft = new();
         _obsChatDraft = new();
+        _obsIntegrationDraft = new();
         _pollsDraft = new();
         _dashboardDraft = null;
 
@@ -246,6 +254,7 @@ public partial class SettingsForm : Form
             _settingsManager.SaveSettings(_settings);
             _accountsStore.SaveAll(_botDraft, _broadcasterDraft);
             _obsChatStore.Save(_obsChatDraft);
+            _obsIntegrationStore.Save(_obsIntegrationDraft);
             _pollsStore.Save(_pollsDraft);
 
             if (_dashboardDraft != null)

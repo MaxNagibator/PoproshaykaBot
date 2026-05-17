@@ -9,6 +9,7 @@ public sealed class BroadcastProfile
     public string GameName { get; set; } = string.Empty;
     public string BroadcasterLanguage { get; set; } = "ru";
     public List<string> Tags { get; set; } = [];
+    public string ObsSceneName { get; set; } = string.Empty;
     public int CurrentNumber { get; set; } = 1;
     public DateTimeOffset? LastApplyAt { get; set; }
     public DateTimeOffset? LastAutoAdvanceAt { get; set; }

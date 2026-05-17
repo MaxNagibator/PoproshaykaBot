@@ -15,6 +15,7 @@ public static class SettingsServiceCollectionExtensions
         services.AddSingleton<RecentCategoriesStore>();
         services.AddSingleton<DashboardLayoutStore>();
         services.AddSingleton<ObsChatStore>();
+        services.AddSingleton<ObsIntegrationStore>();
         services.AddSingleton<OnboardingChecklist>();
         return services;
     }

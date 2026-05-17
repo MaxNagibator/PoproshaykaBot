@@ -22,6 +22,8 @@ namespace PoproshaykaBot.WinForms.Forms.Broadcast
         private System.Windows.Forms.TextBox _tagsTextBox;
         private System.Windows.Forms.Label _languageLbl;
         private System.Windows.Forms.ComboBox _languageComboBox;
+        private System.Windows.Forms.Label _obsSceneLbl;
+        private System.Windows.Forms.ComboBox _obsSceneComboBox;
         private System.Windows.Forms.FlowLayoutPanel _buttonsFlow;
         private System.Windows.Forms.Button _okButton;
         private System.Windows.Forms.Button _cancelButton;
@@ -50,6 +52,8 @@ namespace PoproshaykaBot.WinForms.Forms.Broadcast
             _tagsTextBox = new TextBox();
             _languageLbl = new Label();
             _languageComboBox = new ComboBox();
+            _obsSceneLbl = new Label();
+            _obsSceneComboBox = new ComboBox();
             _buttonsFlow = new FlowLayoutPanel();
             _okButton = new Button();
             _cancelButton = new Button();
@@ -77,12 +81,14 @@ namespace PoproshaykaBot.WinForms.Forms.Broadcast
             _mainLayout.Controls.Add(_tagsTextBox, 1, 5);
             _mainLayout.Controls.Add(_languageLbl, 0, 6);
             _mainLayout.Controls.Add(_languageComboBox, 1, 6);
-            _mainLayout.Controls.Add(_buttonsFlow, 0, 7);
+            _mainLayout.Controls.Add(_obsSceneLbl, 0, 7);
+            _mainLayout.Controls.Add(_obsSceneComboBox, 1, 7);
+            _mainLayout.Controls.Add(_buttonsFlow, 0, 8);
             _mainLayout.Dock = DockStyle.Fill;
             _mainLayout.Location = new Point(0, 0);
             _mainLayout.Name = "_mainLayout";
             _mainLayout.Padding = new Padding(8);
-            _mainLayout.RowCount = 8;
+            _mainLayout.RowCount = 9;
             _mainLayout.RowStyles.Add(new RowStyle());
             _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62F));
             _mainLayout.RowStyles.Add(new RowStyle());
@@ -91,7 +97,8 @@ namespace PoproshaykaBot.WinForms.Forms.Broadcast
             _mainLayout.RowStyles.Add(new RowStyle());
             _mainLayout.RowStyles.Add(new RowStyle());
             _mainLayout.RowStyles.Add(new RowStyle());
-            _mainLayout.Size = new Size(661, 391);
+            _mainLayout.RowStyles.Add(new RowStyle());
+            _mainLayout.Size = new Size(661, 430);
             _mainLayout.TabIndex = 0;
             // 
             // _nameLbl
@@ -254,9 +261,27 @@ namespace PoproshaykaBot.WinForms.Forms.Broadcast
             _languageComboBox.Name = "_languageComboBox";
             _languageComboBox.Size = new Size(565, 23);
             _languageComboBox.TabIndex = 11;
-            // 
+            //
+            // _obsSceneLbl
+            //
+            _obsSceneLbl.Anchor = AnchorStyles.Left;
+            _obsSceneLbl.AutoSize = true;
+            _obsSceneLbl.Margin = new Padding(0, 6, 6, 4);
+            _obsSceneLbl.Name = "_obsSceneLbl";
+            _obsSceneLbl.TabIndex = 12;
+            _obsSceneLbl.Text = "Сцена OBS:";
+            //
+            // _obsSceneComboBox
+            //
+            _obsSceneComboBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            _obsSceneComboBox.FormattingEnabled = true;
+            _obsSceneComboBox.Margin = new Padding(0, 3, 0, 4);
+            _obsSceneComboBox.Name = "_obsSceneComboBox";
+            _obsSceneComboBox.Size = new Size(565, 23);
+            _obsSceneComboBox.TabIndex = 13;
+            //
             // _buttonsFlow
-            // 
+            //
             _buttonsFlow.Anchor = AnchorStyles.Right;
             _buttonsFlow.AutoSize = true;
             _mainLayout.SetColumnSpan(_buttonsFlow, 2);
@@ -266,7 +291,7 @@ namespace PoproshaykaBot.WinForms.Forms.Broadcast
             _buttonsFlow.Margin = new Padding(0, 8, 0, 0);
             _buttonsFlow.Name = "_buttonsFlow";
             _buttonsFlow.Size = new Size(156, 25);
-            _buttonsFlow.TabIndex = 12;
+            _buttonsFlow.TabIndex = 14;
             // 
             // _okButton
             // 
@@ -297,10 +322,10 @@ namespace PoproshaykaBot.WinForms.Forms.Broadcast
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = _cancelButton;
-            ClientSize = new Size(661, 391);
+            ClientSize = new Size(661, 430);
             Controls.Add(_mainLayout);
             MinimizeBox = false;
-            MinimumSize = new Size(420, 390);
+            MinimumSize = new Size(420, 430);
             Name = "BroadcastProfileEditDialog";
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
