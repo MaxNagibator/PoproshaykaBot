@@ -71,7 +71,7 @@ public sealed class TwitchHelixClientTests
         {
             Assert.That(user, Is.Null);
             Assert.That(handler.Requests, Is.Empty,
-                "Пустой login не должен генерировать HTTP-вызов — это лишний удар по quota Helix");
+                "Пустой login не должен генерировать HTTP-вызов – это лишний удар по quota Helix");
         }
     }
 
@@ -240,7 +240,7 @@ public sealed class TwitchHelixClientTests
         {
             Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
             Assert.That(ex.TwitchErrorMessage, Is.Null,
-                "Невалидный JSON в теле — TwitchErrorMessage должен быть null, а не падать");
+                "Невалидный JSON в теле – TwitchErrorMessage должен быть null, а не падать");
 
             Assert.That(ex.ResponseBody, Is.EqualTo("<html>502</html>"));
         }
@@ -332,6 +332,74 @@ public sealed class TwitchHelixClientTests
                 new Dictionary<string, string>(), "session-1"));
     }
 
+    [TestCase(HttpStatusCode.NoContent, true)]
+    [TestCase(HttpStatusCode.NotFound, false)]
+    public async Task DeleteEventSubSubscriptionAsync_SendsDeleteByIdAndTreatsMissingAsNotDeleted(HttpStatusCode status, bool expected)
+    {
+        var (client, handler) = Build(StubHttpMessageHandler.ReturnsStatus(status));
+
+        var deleted = await client.DeleteEventSubSubscriptionAsync("sub id/1");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(deleted, Is.EqualTo(expected));
+            Assert.That(handler.Requests, Has.Count.EqualTo(1));
+            Assert.That(handler.Requests[0].Method, Is.EqualTo(HttpMethod.Delete));
+            Assert.That(handler.Requests[0].RequestUri!.AbsoluteUri,
+                Is.EqualTo(HelixBaseUrl + "helix/eventsub/subscriptions?id=sub%20id%2F1"));
+        }
+    }
+
+    [Test]
+    public async Task GetEventSubSubscriptionsByUserAsync_FiltersByUserIdAndFollowsCursor()
+    {
+        var handler = new StubHttpMessageHandler
+        {
+            Responder = request => new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(request.RequestUri!.Query.Contains("after=")
+                        ? """{"data":[{"id":"sub-2","status":"websocket_disconnected","type":"stream.offline","condition":{"broadcaster_user_id":"42"},"transport":{"method":"websocket","session_id":"s-0"}}],"pagination":{}}"""
+                        : """{"data":[{"id":"sub-1","status":"enabled","type":"stream.online","condition":{"broadcaster_user_id":"42"},"transport":{"method":"websocket","session_id":"s-1"}}],"pagination":{"cursor":"page 2"}}""",
+                    System.Text.Encoding.UTF8,
+                    "application/json"),
+            },
+        };
+
+        var factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient(Arg.Any<string>())
+            .Returns(_ => new HttpClient(handler, disposeHandler: false) { BaseAddress = new(HelixBaseUrl) });
+
+        var client = new BotHelixClient(factory, NullLogger<BotHelixClient>.Instance);
+
+        var subscriptions = await client.GetEventSubSubscriptionsByUserAsync("42");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(handler.Requests.Select(r => r.RequestUri!.AbsoluteUri), Is.EqualTo(new[]
+            {
+                HelixBaseUrl + "helix/eventsub/subscriptions?user_id=42",
+                HelixBaseUrl + "helix/eventsub/subscriptions?user_id=42&after=page%202",
+            }));
+
+            Assert.That(subscriptions.Select(s => (s.Id, s.Type, s.Status, s.SessionId)), Is.EqualTo(new[]
+            {
+                ("sub-1", "stream.online", "enabled", (string?)"s-1"),
+                ("sub-2", "stream.offline", "websocket_disconnected", (string?)"s-0"),
+            }));
+        }
+    }
+
+    [Test]
+    public void DeleteEventSubSubscriptionAsync_ServerError_ThrowsHelixRequestException()
+    {
+        var (client, _) = Build(StubHttpMessageHandler.ReturnsJson(HttpStatusCode.InternalServerError,
+            """{"error":"Internal Server Error","status":500,"message":"oops"}"""));
+
+        var ex = Assert.ThrowsAsync<HelixRequestException>(async () => await client.DeleteEventSubSubscriptionAsync("sub-1"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
+    }
+
     [Test]
     public async Task CreatePollAsync_ZeroChannelPointsWhenVotingDisabled_EvenIfPerVoteSet()
     {
@@ -367,11 +435,11 @@ public sealed class TwitchHelixClientTests
         var body = handler.RequestBodies[0]!;
         var json = JsonDocument.Parse(body).RootElement;
         Assert.That(json.GetProperty("channel_points_per_vote").GetInt32(), Is.Zero,
-            "Когда голосование за channel points отключено, поле должно уйти нулём — иначе Twitch отказывает 400");
+            "Когда голосование за channel points отключено, поле должно уйти нулём – иначе Twitch отказывает 400");
     }
 
     [Test]
-    public async Task GetPollsAsync_StatusOptional_OmitsParameterWhenNotProvided()
+    public async Task GetPollsAsync_NeverSendsStatusParameter()
     {
         var (client, handler) = Build(StubHttpMessageHandler.ReturnsJson(HttpStatusCode.OK, """{"data":[]}"""));
 
@@ -383,18 +451,8 @@ public sealed class TwitchHelixClientTests
             Assert.That(url, Does.Contain("broadcaster_id=12345"));
             Assert.That(url, Does.Contain("first=5"));
             Assert.That(url, Does.Not.Contain("status="),
-                "Если status=null, query-параметр не должен добавляться");
+                "Get Polls не фильтрует по статусу, параметр status слать нельзя");
         }
-    }
-
-    [Test]
-    public async Task GetPollsAsync_StatusProvided_AppendsParameter()
-    {
-        var (client, handler) = Build(StubHttpMessageHandler.ReturnsJson(HttpStatusCode.OK, """{"data":[]}"""));
-
-        await client.GetPollsAsync("12345", "ACTIVE", 1);
-
-        Assert.That(handler.Requests[0].RequestUri!.AbsoluteUri, Does.Contain("status=ACTIVE"));
     }
 
     [Test]
@@ -421,6 +479,44 @@ public sealed class TwitchHelixClientTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result, Is.Null);
+            Assert.That(handler.Requests, Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task GetGamesByNamesAsync_SendsOneNameParameterPerGame_AndDropsBlanks()
+    {
+        const string Body = """
+                            {
+                              "data": [
+                                { "id": "509658", "name": "Just Chatting", "box_art_url": "https://cdn/{width}x{height}.jpg", "igdb_id": "" }
+                              ]
+                            }
+                            """;
+
+        var (client, handler) = Build(StubHttpMessageHandler.ReturnsJson(HttpStatusCode.OK, Body));
+
+        var games = await client.GetGamesByNamesAsync(["Just Chatting", "just chatting", "  ", "Dota 2"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(games, Has.Count.EqualTo(1));
+            Assert.That(games[0].BoxArtUrl, Is.EqualTo("https://cdn/{width}x{height}.jpg"));
+            Assert.That(handler.Requests[0].RequestUri!.AbsoluteUri,
+                Is.EqualTo(HelixBaseUrl + "helix/games?name=Just%20Chatting&name=Dota%202"));
+        }
+    }
+
+    [Test]
+    public async Task GetGamesByNamesAsync_NoNames_ReturnsEmpty_WithoutHttpCall()
+    {
+        var (client, handler) = Build();
+
+        var games = await client.GetGamesByNamesAsync(["", "   "]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(games, Is.Empty);
             Assert.That(handler.Requests, Is.Empty);
         }
     }

@@ -63,9 +63,9 @@ partial class WelcomePage
         _bodyText.Text =
             "Понадобится приложение в Twitch Developer Console: оно даёт пару Client ID + Client Secret и принимает Redirect URI."
             + Environment.NewLine + Environment.NewLine
-            + "Если приложения ещё нет — откройте консоль, создайте новое приложение, укажите Redirect URI http://localhost:3000 (порт можно поменять)."
+            + "Если приложения ещё нет – откройте консоль, создайте новое приложение, укажите Redirect URI http://localhost:3000 (порт можно поменять)."
             + Environment.NewLine + Environment.NewLine
-            + "Если уже есть — переходите к следующему шагу.";
+            + "Если уже есть – переходите к следующему шагу.";
         _bodyText.TextAlign = ContentAlignment.MiddleLeft;
         //
         // _consoleLink

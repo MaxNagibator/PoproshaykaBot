@@ -34,6 +34,8 @@ partial class MainForm
     {
         var resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
         _mainTableLayoutPanel = new TableLayoutPanel();
+        _debugBannerPanel = new Panel();
+        _debugBannerLabel = new Label();
         _updateBannerPanel = new Panel();
         _updateBannerLabel = new Label();
         _updateBannerButtonsPanel = new FlowLayoutPanel();
@@ -53,6 +55,7 @@ partial class MainForm
         _streamMonitoringStatusLabel = new ToolStripStatusLabel();
         _statusStrip = new StatusStrip();
         _mainTableLayoutPanel.SuspendLayout();
+        _debugBannerPanel.SuspendLayout();
         _updateBannerPanel.SuspendLayout();
         _updateBannerButtonsPanel.SuspendLayout();
         _onboardingBannerPanel.SuspendLayout();
@@ -64,20 +67,45 @@ partial class MainForm
         // 
         _mainTableLayoutPanel.ColumnCount = 1;
         _mainTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        _mainTableLayoutPanel.Controls.Add(_updateBannerPanel, 0, 0);
-        _mainTableLayoutPanel.Controls.Add(_onboardingBannerPanel, 0, 1);
-        _mainTableLayoutPanel.Controls.Add(_mainToolStrip, 0, 2);
-        _mainTableLayoutPanel.Controls.Add(_dashboardControl, 0, 3);
+        _mainTableLayoutPanel.Controls.Add(_debugBannerPanel, 0, 0);
+        _mainTableLayoutPanel.Controls.Add(_updateBannerPanel, 0, 1);
+        _mainTableLayoutPanel.Controls.Add(_onboardingBannerPanel, 0, 2);
+        _mainTableLayoutPanel.Controls.Add(_mainToolStrip, 0, 3);
+        _mainTableLayoutPanel.Controls.Add(_dashboardControl, 0, 4);
         _mainTableLayoutPanel.Dock = DockStyle.Fill;
         _mainTableLayoutPanel.Location = new Point(0, 0);
         _mainTableLayoutPanel.Name = "_mainTableLayoutPanel";
-        _mainTableLayoutPanel.RowCount = 4;
+        _mainTableLayoutPanel.RowCount = 5;
+        _mainTableLayoutPanel.RowStyles.Add(new RowStyle());
         _mainTableLayoutPanel.RowStyles.Add(new RowStyle());
         _mainTableLayoutPanel.RowStyles.Add(new RowStyle());
         _mainTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
         _mainTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         _mainTableLayoutPanel.Size = new Size(800, 562);
         _mainTableLayoutPanel.TabIndex = 0;
+        //
+        // _debugBannerPanel
+        //
+        _debugBannerPanel.BackColor = Color.LightCyan;
+        _debugBannerPanel.Controls.Add(_debugBannerLabel);
+        _debugBannerPanel.Dock = DockStyle.Fill;
+        _debugBannerPanel.Margin = new Padding(0);
+        _debugBannerPanel.MinimumSize = new Size(0, 40);
+        _debugBannerPanel.Name = "_debugBannerPanel";
+        _debugBannerPanel.Padding = new Padding(10, 6, 10, 6);
+        _debugBannerPanel.Size = new Size(800, 40);
+        _debugBannerPanel.TabIndex = 0;
+        _debugBannerPanel.Visible = false;
+        //
+        // _debugBannerLabel
+        //
+        _debugBannerLabel.AutoSize = false;
+        _debugBannerLabel.Dock = DockStyle.Fill;
+        _debugBannerLabel.ForeColor = Color.Teal;
+        _debugBannerLabel.Name = "_debugBannerLabel";
+        _debugBannerLabel.Size = new Size(780, 28);
+        _debugBannerLabel.TabIndex = 0;
+        _debugBannerLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // _updateBannerPanel
         //
@@ -276,6 +304,7 @@ partial class MainForm
         MinimumSize = new Size(594, 376);
         Name = "MainForm";
         Text = "Попрощайка Бот - Управление";
+        _debugBannerPanel.ResumeLayout(false);
         _mainTableLayoutPanel.ResumeLayout(false);
         _mainTableLayoutPanel.PerformLayout();
         _updateBannerPanel.ResumeLayout(false);
@@ -292,6 +321,8 @@ partial class MainForm
     }
 
     private TableLayoutPanel _mainTableLayoutPanel;
+    private Panel _debugBannerPanel;
+    private Label _debugBannerLabel;
     private Panel _updateBannerPanel;
     private Label _updateBannerLabel;
     private FlowLayoutPanel _updateBannerButtonsPanel;

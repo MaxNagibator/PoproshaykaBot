@@ -14,12 +14,22 @@ public sealed class StreamSessionRecord
     public int ChatterCount { get; set; }
     public int PeakViewers { get; set; }
     public int AverageViewers { get; set; }
+    public bool IsHidden { get; set; }
     public List<StreamSessionChatter> Chatters { get; set; } = [];
 
     public List<StreamSessionSegment> Segments { get; set; } = [];
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<StreamSessionInterval>? TrackedIntervals { get; set; }
+
     [JsonIgnore]
     public TimeSpan Duration => EndedAt > StartedAt ? EndedAt - StartedAt : TimeSpan.Zero;
+
+    [JsonIgnore]
+    public TimeSpan? TrackedDuration => TrackedIntervals == null
+        ? null
+        : StreamSessionInterval.Normalize(TrackedIntervals, StartedAt, EndedAt)
+            .Aggregate(TimeSpan.Zero, (sum, interval) => sum + interval.Duration);
 
     public void EnsureSegments()
     {

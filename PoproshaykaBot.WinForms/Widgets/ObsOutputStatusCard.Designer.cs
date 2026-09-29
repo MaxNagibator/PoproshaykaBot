@@ -127,7 +127,7 @@ sealed partial class ObsOutputStatusCard
         _stateLabel.Name = "_stateLabel";
         _stateLabel.Size = new Size(60, 52);
         _stateLabel.TabIndex = 1;
-        _stateLabel.Text = "—";
+        _stateLabel.Text = "–";
         _stateLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // _topRightLayoutPanel
@@ -173,7 +173,7 @@ sealed partial class ObsOutputStatusCard
         _timecodeLabel.Name = "_timecodeLabel";
         _timecodeLabel.Size = new Size(78, 38);
         _timecodeLabel.TabIndex = 1;
-        _timecodeLabel.Text = "—:—:—";
+        _timecodeLabel.Text = "–:–:–";
         _timecodeLabel.TextAlign = ContentAlignment.MiddleRight;
         //
         // _metaLabel
@@ -202,7 +202,7 @@ sealed partial class ObsOutputStatusCard
         _primaryButton.Name = "_primaryButton";
         _primaryButton.Size = new Size(78, 68);
         _primaryButton.TabIndex = 2;
-        _primaryButton.Text = "—";
+        _primaryButton.Text = "–";
         _primaryButton.UseVisualStyleBackColor = true;
         _primaryButton.Click += OnPrimaryButtonClick;
         //
@@ -230,7 +230,7 @@ sealed partial class ObsOutputStatusCard
         _secondaryButton.Name = "_secondaryButton";
         _secondaryButton.Size = new Size(78, 68);
         _secondaryButton.TabIndex = 0;
-        _secondaryButton.Text = "—";
+        _secondaryButton.Text = "–";
         _secondaryButton.UseVisualStyleBackColor = true;
         _secondaryButton.Click += OnSecondaryButtonClick;
         //
@@ -247,7 +247,7 @@ sealed partial class ObsOutputStatusCard
         _secondaryChipLabel.Padding = new Padding(2);
         _secondaryChipLabel.Size = new Size(78, 68);
         _secondaryChipLabel.TabIndex = 1;
-        _secondaryChipLabel.Text = "—";
+        _secondaryChipLabel.Text = "–";
         _secondaryChipLabel.TextAlign = ContentAlignment.MiddleCenter;
         _secondaryChipLabel.Visible = false;
         //

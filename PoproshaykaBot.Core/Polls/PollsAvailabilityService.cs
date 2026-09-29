@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Settings.Stores;
 using PoproshaykaBot.Core.Twitch;
 using PoproshaykaBot.Core.Twitch.Helix;
@@ -15,6 +16,7 @@ public class PollsAvailabilityService(
     [FromKeyedServices(TwitchEndpoints.HelixBotClient)]
     ITwitchHelixClient helix,
     IBroadcasterIdProvider broadcasterIdProvider,
+    ITargetChannelProvider targetChannelProvider,
     AccountsStore accountsStore,
     ILogger<PollsAvailabilityService>? logger = null)
 {
@@ -23,6 +25,14 @@ public class PollsAvailabilityService(
 
     public virtual async Task<PollsAvailability> GetAsync(CancellationToken cancellationToken)
     {
+        var target = targetChannelProvider.Current;
+
+        if (target.IsForeign)
+        {
+            logger?.LogInformation("PollsAvailability: отладка на чужом канале {Channel} – голосования недоступны", target.Login);
+            return PollsAvailability.ForeignChannel;
+        }
+
         if (_cached is not null)
         {
             return _cached;
@@ -57,7 +67,7 @@ public class PollsAvailabilityService(
         {
             if (string.IsNullOrWhiteSpace(accountsStore.LoadBroadcaster().AccessToken))
             {
-                logger?.LogInformation("PollsAvailability: токен стримера отсутствует — голосования недоступны");
+                logger?.LogInformation("PollsAvailability: токен стримера отсутствует – голосования недоступны");
                 return PollsAvailability.NoBroadcasterToken;
             }
 
@@ -81,20 +91,20 @@ public class PollsAvailabilityService(
             if (string.Equals(tier, "affiliate", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(tier, "partner", StringComparison.OrdinalIgnoreCase))
             {
-                logger?.LogInformation("PollsAvailability: канал {Login} имеет статус '{Tier}' — голосования доступны",
+                logger?.LogInformation("PollsAvailability: канал {Login} имеет статус '{Tier}' – голосования доступны",
                     broadcaster.Login, tier);
 
                 return PollsAvailability.Available;
             }
 
-            logger?.LogInformation("PollsAvailability: канал {Login} не Affiliate/Partner (tier='{Tier}') — голосования недоступны",
+            logger?.LogInformation("PollsAvailability: канал {Login} не Affiliate/Partner (tier='{Tier}') – голосования недоступны",
                 broadcaster.Login, tier);
 
             return PollsAvailability.NotAffiliate;
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "PollsAvailability: не удалось проверить статус канала — считаем доступным, ошибки будут при вызове API");
+            logger?.LogWarning(ex, "PollsAvailability: не удалось проверить статус канала – считаем доступным, ошибки будут при вызове API");
             return PollsAvailability.Available;
         }
     }

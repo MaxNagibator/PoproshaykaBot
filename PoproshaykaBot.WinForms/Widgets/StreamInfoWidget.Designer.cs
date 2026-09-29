@@ -133,7 +133,7 @@ sealed partial class StreamInfoWidget
         _gameLabel.ForeColor = Color.DimGray;
         _gameLabel.Name = "_gameLabel";
         _gameLabel.TabIndex = 2;
-        _gameLabel.Text = "—";
+        _gameLabel.Text = "–";
         _gameLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // _statsTableLayoutPanel
@@ -158,7 +158,7 @@ sealed partial class StreamInfoWidget
         _viewersLabel.Dock = DockStyle.Fill;
         _viewersLabel.Name = "_viewersLabel";
         _viewersLabel.TabIndex = 0;
-        _viewersLabel.Text = "👥 —";
+        _viewersLabel.Text = "👥 –";
         _viewersLabel.TextAlign = ContentAlignment.MiddleCenter;
         //
         // _uptimeLabel
@@ -166,7 +166,7 @@ sealed partial class StreamInfoWidget
         _uptimeLabel.Dock = DockStyle.Fill;
         _uptimeLabel.Name = "_uptimeLabel";
         _uptimeLabel.TabIndex = 1;
-        _uptimeLabel.Text = "⏱️ —";
+        _uptimeLabel.Text = "⏱️ –";
         _uptimeLabel.TextAlign = ContentAlignment.MiddleCenter;
         //
         // _lastUpdateLabel
@@ -176,7 +176,7 @@ sealed partial class StreamInfoWidget
         _lastUpdateLabel.ForeColor = Color.Gray;
         _lastUpdateLabel.Name = "_lastUpdateLabel";
         _lastUpdateLabel.TabIndex = 2;
-        _lastUpdateLabel.Text = "🕐 —";
+        _lastUpdateLabel.Text = "🕐 –";
         _lastUpdateLabel.TextAlign = ContentAlignment.MiddleRight;
         //
         // _streamInfoTimer

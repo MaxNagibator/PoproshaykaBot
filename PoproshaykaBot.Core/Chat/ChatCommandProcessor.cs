@@ -1,24 +1,36 @@
 ﻿using Microsoft.Extensions.Logging;
 using PoproshaykaBot.Core.Chat.Commands;
 using PoproshaykaBot.Core.Infrastructure;
+using PoproshaykaBot.Core.Settings.Stores;
+using PoproshaykaBot.Core.Statistics;
 
 namespace PoproshaykaBot.Core.Chat;
 
 public sealed class ChatCommandProcessor
 {
+    public const string DefaultPrefix = "!";
+
     private readonly string _unknownCommandsFilePath;
     private readonly Dictionary<string, IChatCommand> _tokenToCommand;
-    private readonly string _prefix;
+    private readonly CommandSettingsStore _commandSettingsStore;
+    private readonly CommandUsageRepository _usageRepository;
     private readonly ILogger<ChatCommandProcessor> _logger;
 
-    public ChatCommandProcessor(IEnumerable<IChatCommand> commands, ILogger<ChatCommandProcessor> logger, string prefix = "!")
+    public ChatCommandProcessor(
+        IEnumerable<IChatCommand> commands,
+        CommandSettingsStore commandSettingsStore,
+        CommandUsageRepository usageRepository,
+        ILogger<ChatCommandProcessor> logger,
+        string prefix = DefaultPrefix)
     {
+        _commandSettingsStore = commandSettingsStore;
+        _usageRepository = usageRepository;
         _logger = logger;
 
         Directory.CreateDirectory(AppPaths.BaseDirectory);
         _unknownCommandsFilePath = AppPaths.Combine("unknown_commands.txt");
 
-        _prefix = string.IsNullOrWhiteSpace(prefix) ? "!" : prefix;
+        Prefix = string.IsNullOrWhiteSpace(prefix) ? DefaultPrefix : prefix;
         _tokenToCommand = new(StringComparer.OrdinalIgnoreCase);
 
         foreach (var command in commands)
@@ -27,13 +39,15 @@ public sealed class ChatCommandProcessor
         }
     }
 
+    public string Prefix { get; }
+
     public void Register(IChatCommand command)
     {
-        _tokenToCommand[command.Canonical] = command;
+        RegisterToken(command.Canonical, command);
 
         foreach (var alias in command.Aliases.Where(a => !string.IsNullOrWhiteSpace(a)))
         {
-            _tokenToCommand[alias] = command;
+            RegisterToken(alias, command);
         }
     }
 
@@ -46,6 +60,15 @@ public sealed class ChatCommandProcessor
             .ToList();
     }
 
+    public IReadOnlyCollection<IChatCommand> GetEnabledCommands()
+    {
+        var settings = _commandSettingsStore.Load();
+
+        return GetAllCommands()
+            .Where(command => settings.IsEnabled(command.Canonical))
+            .ToList();
+    }
+
     public async Task<ChatCommandResult> TryProcessAsync(string messageText, CommandContext context, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(messageText))
@@ -55,12 +78,12 @@ public sealed class ChatCommandProcessor
 
         var trimmed = messageText.Trim();
 
-        if (!trimmed.StartsWith(_prefix, StringComparison.Ordinal))
+        if (!trimmed.StartsWith(Prefix, StringComparison.Ordinal))
         {
             return ChatCommandResult.NotHandled;
         }
 
-        var afterPrefix = trimmed[_prefix.Length..].Trim();
+        var afterPrefix = trimmed[Prefix.Length..].Trim();
 
         if (string.IsNullOrEmpty(afterPrefix))
         {
@@ -74,6 +97,17 @@ public sealed class ChatCommandProcessor
         if (!_tokenToCommand.TryGetValue(token, out var command))
         {
             LogUnknown(messageText, context);
+            return ChatCommandResult.NotHandled;
+        }
+
+        var settings = _commandSettingsStore.Load();
+
+        if (!settings.IsEnabled(command.Canonical))
+        {
+            _logger.LogDebug("Команда {Canonical} выключена в настройках, сообщение от {Username} пропущено",
+                command.Canonical,
+                context.Username);
+
             return ChatCommandResult.NotHandled;
         }
 
@@ -93,21 +127,68 @@ public sealed class ChatCommandProcessor
             IsModerator = context.IsModerator,
         };
 
+        var requiredLevel = settings.ResolveAccessLevel(command.Canonical);
+
+        if (!requiredLevel.Allows(enrichedContext))
+        {
+            _logger.LogDebug("Команда {Canonical} отклонена для {Username}: настройка прав требует {Level}",
+                command.Canonical,
+                enrichedContext.Username,
+                requiredLevel);
+
+            return ChatCommandResult.NotHandled;
+        }
+
         if (!command.CanExecute(enrichedContext))
         {
+            _logger.LogDebug("Команда {Canonical} отклонена для {Username}: условия выполнения не соблюдены",
+                command.Canonical,
+                enrichedContext.Username);
+
             return ChatCommandResult.NotHandled;
         }
 
         try
         {
             var response = await command.ExecuteAsync(enrichedContext, cancellationToken);
-            return ChatCommandResult.Handled(response);
+
+            _usageRepository.Track(command.Canonical, enrichedContext.DisplayName);
+
+            if (response is null)
+            {
+                _logger.LogInformation("Команда {Canonical} выполнена для {Username}, ответа нет", command.Canonical, enrichedContext.Username);
+            }
+            else
+            {
+                _logger.LogInformation("Команда {Canonical} выполнена для {Username}, ответ {Delivery} длиной {Length} символов",
+                    command.Canonical,
+                    enrichedContext.Username,
+                    response.Delivery,
+                    response.Text.Length);
+            }
+
+            return ChatCommandResult.Succeeded(command.Canonical, response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Команда {Canonical} упала на сообщении от {Username}", command.Canonical, enrichedContext.Username);
-            return ChatCommandResult.Handled(null);
+            return ChatCommandResult.Failed(command.Canonical);
         }
+    }
+
+    private void RegisterToken(string token, IChatCommand command)
+    {
+        if (_tokenToCommand.TryGetValue(token, out var owner) && !ReferenceEquals(owner, command))
+        {
+            _logger.LogWarning("Токен {Token} команды {Canonical} уже занят командой {Owner}, остаётся за ней",
+                token,
+                command.Canonical,
+                owner.Canonical);
+
+            return;
+        }
+
+        _tokenToCommand[token] = command;
     }
 
     private void LogUnknown(string originalText, CommandContext context)
@@ -124,13 +205,18 @@ public sealed class ChatCommandProcessor
     }
 }
 
-public readonly record struct ChatCommandResult(bool IsCommand, OutgoingMessage? Response)
+public readonly record struct ChatCommandResult(bool IsCommand, OutgoingMessage? Response, string? Canonical, bool Executed)
 {
-    public static ChatCommandResult NotHandled { get; } = new(false, null);
+    public static ChatCommandResult NotHandled { get; } = new(false, null, null, false);
 
-    public static ChatCommandResult Handled(OutgoingMessage? response)
+    public static ChatCommandResult Succeeded(string canonical, OutgoingMessage? response)
     {
-        return new(true, response);
+        return new(true, response, canonical, true);
+    }
+
+    public static ChatCommandResult Failed(string canonical)
+    {
+        return new(true, null, canonical, false);
     }
 }
 

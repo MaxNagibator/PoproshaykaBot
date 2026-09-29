@@ -1,0 +1,992 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.UserStatisticsPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels"
+             xmlns:views="clr-namespace:PoproshaykaBot.Wpf.Views"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:controls="clr-namespace:KeepShell.Views.Controls;assembly=KeepShell"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:UserStatisticsPageViewModel}"
+             d:DesignHeight="720"
+             d:DesignWidth="1100">
+
+    <UserControl.Resources>
+
+        <Style x:Key="AdjustmentInput"
+               TargetType="TextBox"
+               BasedOn="{StaticResource TextBox.Numeric}">
+            <Setter Property="Height"
+                    Value="Auto" />
+            <Setter Property="HorizontalAlignment"
+                    Value="Stretch" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasAdjustmentError}"
+                             Value="True">
+                    <Setter Property="BorderBrush"
+                            Value="{DynamicResource State.Error}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="InspectorBonusValue"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource StatValue.Small}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SelectedRow.HasBonus}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.SuccessText}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="InspectorPenaltyValue"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource StatValue.Small}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SelectedRow.HasPenalty}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.ErrorText}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SummaryBonusValue"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource StatValue}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasTotalBonus}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.SuccessText}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SummaryPenaltyValue"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource StatValue}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasTotalPenalty}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.ErrorText}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate x:Key="UserRatingRowTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="RatingPosition" />
+                    <ColumnDefinition Width="*"
+                                      MinWidth="60" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="RatingRank" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="RatingPoints" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="RatingMessages" />
+                </Grid.ColumnDefinitions>
+
+                <ContentPresenter Grid.Column="0"
+                                  Content="{Binding}"
+                                  ContentTemplate="{StaticResource RatingPositionCell}" />
+
+                <TextBlock Grid.Column="1"
+                           Style="{StaticResource RatingName}"
+                           Text="{Binding Name}"
+                           Margin="10,0,10,0" />
+
+                <Border Grid.Column="2"
+                        Style="{StaticResource Badge}"
+                        VerticalAlignment="Center"
+                        Margin="10,0,0,0"
+                        Visibility="{Binding ShowsRankColumn, RelativeSource={RelativeSource AncestorType=views:UserStatisticsPageView}, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="{Binding RankDisplay}"
+                               FontSize="{DynamicResource Font.Size.Caption}"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               TextWrapping="NoWrap" />
+                </Border>
+
+                <TextBlock Grid.Column="3"
+                           Style="{StaticResource RatingNumber.Strong}"
+                           Text="{Binding PointsDisplay}"
+                           Margin="10,0,8,0" />
+
+                <TextBlock Grid.Column="4"
+                           Style="{StaticResource RatingNumber}"
+                           Text="{Binding MessageCountDisplay}"
+                           Margin="10,0,8,0" />
+            </Grid>
+        </DataTemplate>
+
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"
+                                  MinWidth="150"
+                                  MaxWidth="420" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <TextBox x:Name="SearchBox"
+                         Style="{StaticResource TextBox.IconField}"
+                         Padding="10,0,32,0"
+                         Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=250}"
+                         AutomationProperties.Name="Поиск участника по нику или идентификатору" />
+
+                <TextBlock Text="Найти по нику или ID"
+                           Margin="43,0,38,0"
+                           VerticalAlignment="Center"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource Fg.Muted}"
+                           IsHitTestVisible="False"
+                           Visibility="{Binding Text, ElementName=SearchBox, Converter={StaticResource NullToVisibility}, ConverterParameter=Inverse}" />
+
+                <Button HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,2,0"
+                        Style="{StaticResource Button.Icon}"
+                        Command="{Binding ClearFilterCommand}"
+                        AutomationProperties.Name="Очистить поиск"
+                        ToolTip="Очистить поиск"
+                        Visibility="{Binding IsFilterActive, Converter={StaticResource BoolToVisibility}}">
+                    <iconPacks:PackIconLucide Kind="X"
+                                              Width="14"
+                                              Height="14" />
+                </Button>
+            </Grid>
+
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal">
+                <Button Content="Названия баллов"
+                        Style="{StaticResource Button.Secondary}"
+                        Command="{Binding EditPointTermCommand}"
+                        AutomationProperties.Name="Изменить названия баллов"
+                        Margin="16,0,8,0" />
+                <Button Style="{StaticResource Button.Icon}"
+                        Command="{Binding RefreshCommand}"
+                        AutomationProperties.Name="Перечитать статистику"
+                        ToolTip="Перечитать статистику">
+                    <iconPacks:PackIconLucide Kind="RefreshCw"
+                                              Width="14"
+                                              Height="14" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="2*"
+                                  MinWidth="300"
+                                  MaxWidth="380" />
+            </Grid.ColumnDefinitions>
+
+            <controls:EmptyState Grid.Column="0"
+                                 Grid.ColumnSpan="2"
+                                 Icon="Users"
+                                 Heading="{Binding EmptyHeading}"
+                                 Description="{Binding EmptyDescription}"
+                                 DescriptionMaxWidth="320"
+                                 ActionText="{Binding EmptyActionText}"
+                                 ActionCommand="{Binding EmptyActionCommand}"
+                                 Visibility="{Binding HasUsers, Converter={StaticResource InverseBoolToVisibility}}" />
+
+            <Border Grid.Column="0"
+                    Style="{StaticResource Card}"
+                    Padding="0"
+                    Margin="0,0,16,0"
+                    Visibility="{Binding HasUsers, Converter={StaticResource BoolToVisibility}}">
+                <Grid Grid.IsSharedSizeScope="True">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0"
+                                Margin="16,16,16,12">
+                        <WrapPanel Orientation="Horizontal"
+                                   Margin="0,0,-8,-8">
+                            <Border Style="{StaticResource StatCell}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatValue}"
+                                               Text="{Binding TotalUsers}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="участников" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource StatCell}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatValue}"
+                                               Text="{Binding TotalMessages}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="сообщений" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource StatCell}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatValue}"
+                                               Text="{Binding TotalPoints}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="баллов" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource StatCell}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SummaryBonusValue}"
+                                               Text="{Binding TotalBonus}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="бонус" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource StatCell}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SummaryPenaltyValue}"
+                                               Text="{Binding TotalPenalty}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="штраф" />
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
+
+                        <TextBlock Style="{StaticResource StatLabel}"
+                                   Margin="0,10,0,0"
+                                   Text="{Binding VisibleCountText}"
+                                   Visibility="{Binding IsFilterActive, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+
+                    <Border Grid.Row="1"
+                            Height="1"
+                            Background="{DynamicResource Border.Subtle}" />
+
+                    <Grid x:Name="RatingHeader"
+                          Grid.Row="2"
+                          Margin="12,6,24,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="RatingPosition" />
+                            <ColumnDefinition Width="*"
+                                              MinWidth="60" />
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="RatingRank" />
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="RatingPoints" />
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="RatingMessages" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Style="{StaticResource RatingHeaderText}"
+                                   Text="#"
+                                   HorizontalAlignment="Center" />
+
+                        <Button Grid.Column="1"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Left"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByCommand}"
+                                CommandParameter="{x:Static vm:UserStatisticsSortKey.Name}"
+                                AutomationProperties.Name="Сортировать по нику">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Участник" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding NameSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="2"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Left"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByCommand}"
+                                CommandParameter="{x:Static vm:UserStatisticsSortKey.Rank}"
+                                AutomationProperties.Name="Сортировать по рангу"
+                                Visibility="{Binding ShowsRankColumn, RelativeSource={RelativeSource AncestorType=views:UserStatisticsPageView}, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Ранг" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding RankSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="3"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Right"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByCommand}"
+                                CommandParameter="{x:Static vm:UserStatisticsSortKey.Points}"
+                                AutomationProperties.Name="Сортировать по баллам">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Баллы" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding PointsSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="4"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Right"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByCommand}"
+                                CommandParameter="{x:Static vm:UserStatisticsSortKey.Messages}"
+                                AutomationProperties.Name="Сортировать по сообщениям">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Сообщения" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding MessagesSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <ListBox x:Name="RatingList"
+                             Grid.Row="3"
+                             ItemsSource="{Binding Users}"
+                             AutomationProperties.Name="Рейтинг участников"
+                             SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                             ItemContainerStyle="{StaticResource RatingRowItem}"
+                             ItemTemplate="{StaticResource UserRatingRowTemplate}"
+                             SelectionMode="Single"
+                             HorizontalContentAlignment="Stretch"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Visible" />
+                </Grid>
+            </Border>
+
+            <Border x:Name="InspectorCard"
+                    Grid.Column="1"
+                    Style="{StaticResource Card}"
+                    Padding="16"
+                    Visibility="{Binding HasUsers, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ScrollViewer Grid.Row="0"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Visibility="{Binding HasSelectedRow, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding SelectedRow.Name}"
+                                           FontSize="{DynamicResource Font.Size.XL}"
+                                           FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                           Foreground="{DynamicResource Fg.Primary}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding SelectedRow.Name}"
+                                           VerticalAlignment="Center" />
+
+                                <Border Grid.Column="1"
+                                        Style="{StaticResource Badge}"
+                                        VerticalAlignment="Center"
+                                        Margin="10,0,0,0">
+                                    <TextBlock Text="{Binding SelectedRow.RankDisplay}"
+                                               FontSize="{DynamicResource Font.Size.Caption}"
+                                               Foreground="{DynamicResource Fg.Secondary}"
+                                               TextWrapping="NoWrap" />
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Text="{Binding SelectedRow.UserId}"
+                                       FontFamily="{DynamicResource Font.Mono}"
+                                       FontSize="{DynamicResource Font.Size.Caption}"
+                                       Foreground="{DynamicResource Fg.Muted}"
+                                       TextWrapping="NoWrap"
+                                       Margin="0,4,0,0" />
+
+                            <TextBlock Text="{Binding SelectedPlaceText}"
+                                       Foreground="{DynamicResource Fg.Secondary}"
+                                       Margin="0,2,0,0" />
+
+                            <UniformGrid Columns="2"
+                                         Margin="0,16,0,0">
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Style="{StaticResource StatValue.Small}"
+                                               Text="{Binding SelectedRow.PointsDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="баллов" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Style="{StaticResource StatValue.Small}"
+                                               Text="{Binding SelectedRow.MessageCountDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="сообщений" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Style="{StaticResource InspectorBonusValue}"
+                                               Text="{Binding SelectedRow.BonusDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="бонус" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Style="{StaticResource InspectorPenaltyValue}"
+                                               Text="{Binding SelectedRow.PenaltyDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="штраф" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Style="{StaticResource StatValue.Small}"
+                                               Text="{Binding SelectedRow.DaysInChatDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="в чате дней" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Style="{StaticResource StatValue.Small}"
+                                               Text="{Binding SelectedRow.DailyRateDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="сообщений в день" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,12,0"
+                                            Background="Transparent"
+                                            ToolTip="{Binding SelectedRow.FirstSeenMoment}">
+                                    <TextBlock Style="{StaticResource StatValue.Small}"
+                                               Text="{Binding SelectedRow.FirstSeenDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="в чате с" />
+                                </StackPanel>
+
+                                <StackPanel Background="Transparent"
+                                            ToolTip="{Binding SelectedRow.LastSeenMoment}">
+                                    <TextBlock Style="{StaticResource StatValue.Small}"
+                                               Text="{Binding SelectedRow.LastSeenDisplay}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="писал" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               FontFamily="{DynamicResource Font.Mono}"
+                                               Text="{Binding SelectedRow.LastSeenMoment}" />
+                                </StackPanel>
+                            </UniformGrid>
+
+                            <TextBlock Style="{StaticResource StatLabel}"
+                                       Text="состав баллов"
+                                       Margin="0,16,0,0" />
+
+                            <Border Background="{DynamicResource Bg.SurfaceMute}"
+                                    CornerRadius="5"
+                                    Height="10"
+                                    Margin="0,6,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="{Binding SelectedRow.MessagesTrack}" />
+                                        <ColumnDefinition Width="{Binding SelectedRow.BonusTrack}" />
+                                        <ColumnDefinition Width="{Binding SelectedRow.PenaltyTrack}" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0"
+                                            Background="{DynamicResource Accent.Primary}"
+                                            CornerRadius="5"
+                                            Margin="0,0,2,0" />
+                                    <Border Grid.Column="1"
+                                            Background="{DynamicResource State.Success}"
+                                            CornerRadius="5"
+                                            Margin="0,0,2,0" />
+                                    <Border Grid.Column="2"
+                                            Background="{DynamicResource State.Error}"
+                                            CornerRadius="5" />
+                                </Grid>
+                            </Border>
+
+                            <WrapPanel Orientation="Horizontal"
+                                       Margin="0,8,0,0">
+                                <TextBlock Text="{Binding SelectedRow.MessagesPartText}"
+                                           FontSize="{DynamicResource Font.Size.Caption}"
+                                           Foreground="{DynamicResource Fg.Secondary}"
+                                           Margin="0,0,12,0" />
+                                <TextBlock Text="{Binding SelectedRow.BonusPartText}"
+                                           FontSize="{DynamicResource Font.Size.Caption}"
+                                           Foreground="{DynamicResource State.SuccessText}"
+                                           Margin="0,0,12,0"
+                                           Visibility="{Binding SelectedRow.HasBonus, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding SelectedRow.PenaltyPartText}"
+                                           FontSize="{DynamicResource Font.Size.Caption}"
+                                           Foreground="{DynamicResource State.ErrorText}"
+                                           Visibility="{Binding SelectedRow.HasPenalty, Converter={StaticResource BoolToVisibility}}" />
+                            </WrapPanel>
+
+                            <StackPanel Margin="0,16,0,0"
+                                        Visibility="{Binding SelectedRow.HasRankLadder, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Style="{StaticResource StatLabel}"
+                                           Text="путь по рангам" />
+
+                                <ItemsControl x:Name="RankLadder"
+                                              ItemsSource="{Binding RankLadderSteps}"
+                                              Focusable="False"
+                                              Grid.IsSharedSizeScope="True"
+                                              AutomationProperties.Name="{Binding SelectedRow.RankLadder.Summary}"
+                                              Margin="0,6,0,0">
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="AutomationProperties.Name"
+                                                    Value="{Binding AutomationName}" />
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
+
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:UserRankLadderStep}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="18" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+
+                                                <Grid Grid.Column="0"
+                                                      Grid.Row="0">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="*" />
+                                                    </Grid.RowDefinitions>
+
+                                                    <Border Grid.Row="0"
+                                                            Width="2"
+                                                            HorizontalAlignment="Center"
+                                                            Visibility="{Binding HasAbove, Converter={StaticResource BoolToVisibility}}">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background"
+                                                                        Value="{DynamicResource Border.Default}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsAboveReached}"
+                                                                                 Value="True">
+                                                                        <Setter Property="Background"
+                                                                                Value="{DynamicResource Accent.Primary}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                    </Border>
+
+                                                    <Border Grid.Row="1"
+                                                            Width="2"
+                                                            HorizontalAlignment="Center"
+                                                            Visibility="{Binding HasBelow, Converter={StaticResource BoolToVisibility}}">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background"
+                                                                        Value="{DynamicResource Border.Default}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsReached}"
+                                                                                 Value="True">
+                                                                        <Setter Property="Background"
+                                                                                Value="{DynamicResource Accent.Primary}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                    </Border>
+
+                                                    <Border Grid.RowSpan="2"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Width"
+                                                                        Value="10" />
+                                                                <Setter Property="Height"
+                                                                        Value="10" />
+                                                                <Setter Property="CornerRadius"
+                                                                        Value="5" />
+                                                                <Setter Property="Background"
+                                                                        Value="{DynamicResource Bg.Surface}" />
+                                                                <Setter Property="BorderBrush"
+                                                                        Value="{DynamicResource Border.Strong}" />
+                                                                <Setter Property="BorderThickness"
+                                                                        Value="1.5" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsPassed}"
+                                                                                 Value="True">
+                                                                        <Setter Property="Width"
+                                                                                Value="14" />
+                                                                        <Setter Property="Height"
+                                                                                Value="14" />
+                                                                        <Setter Property="CornerRadius"
+                                                                                Value="7" />
+                                                                        <Setter Property="Background"
+                                                                                Value="{DynamicResource Accent.Primary}" />
+                                                                        <Setter Property="BorderThickness"
+                                                                                Value="0" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsCurrent}"
+                                                                                 Value="True">
+                                                                        <Setter Property="Width"
+                                                                                Value="14" />
+                                                                        <Setter Property="Height"
+                                                                                Value="14" />
+                                                                        <Setter Property="CornerRadius"
+                                                                                Value="7" />
+                                                                        <Setter Property="BorderBrush"
+                                                                                Value="{DynamicResource Accent.Primary}" />
+                                                                        <Setter Property="BorderThickness"
+                                                                                Value="4" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsGap}"
+                                                                                 Value="True">
+                                                                        <Setter Property="Visibility"
+                                                                                Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+
+                                                        <TextBlock Text="✓"
+                                                                   FontSize="10"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{DynamicResource Fg.OnAccent}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Visibility="{Binding IsPassed, Converter={StaticResource BoolToVisibility}}" />
+                                                    </Border>
+                                                </Grid>
+
+                                                <Border Grid.Column="0"
+                                                        Grid.Row="1"
+                                                        Width="2"
+                                                        HorizontalAlignment="Center"
+                                                        Visibility="{Binding HasBelow, Converter={StaticResource BoolToVisibility}}">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background"
+                                                                    Value="{DynamicResource Border.Default}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsReached}"
+                                                                             Value="True">
+                                                                    <Setter Property="Background"
+                                                                            Value="{DynamicResource Accent.Primary}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                </Border>
+
+                                                <Border Grid.Column="1"
+                                                        Grid.Row="0"
+                                                        Grid.RowSpan="2"
+                                                        Margin="4,1,0,1"
+                                                        CornerRadius="{DynamicResource Radius.S}">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background"
+                                                                    Value="Transparent" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsCurrent}"
+                                                                             Value="True">
+                                                                    <Setter Property="Background"
+                                                                            Value="{DynamicResource Accent.Soft}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                </Border>
+
+                                                <Grid Grid.Column="1"
+                                                      Grid.Row="0"
+                                                      Margin="8,4,8,4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"
+                                                                          SharedSizeGroup="LadderEmoji" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto"
+                                                                          SharedSizeGroup="LadderThreshold" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Emoji}"
+                                                               Foreground="{DynamicResource Fg.Secondary}"
+                                                               TextWrapping="NoWrap"
+                                                               Margin="0,0,8,0" />
+
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Name}"
+                                                               TextWrapping="NoWrap"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Name}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground"
+                                                                        Value="{DynamicResource Fg.Primary}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsReached}"
+                                                                                 Value="False">
+                                                                        <Setter Property="Foreground"
+                                                                                Value="{DynamicResource Fg.Secondary}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsCurrent}"
+                                                                                 Value="True">
+                                                                        <Setter Property="FontWeight"
+                                                                                Value="{DynamicResource Font.Weight.SemiBold}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsGap}"
+                                                                                 Value="True">
+                                                                        <Setter Property="Foreground"
+                                                                                Value="{DynamicResource Fg.Secondary}" />
+                                                                        <Setter Property="FontSize"
+                                                                                Value="{DynamicResource Font.Size.Caption}" />
+                                                                        <Setter Property="Grid.ColumnSpan"
+                                                                                Value="2" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding ThresholdText}"
+                                                               Foreground="{DynamicResource Fg.Secondary}"
+                                                               TextAlignment="Right"
+                                                               TextWrapping="NoWrap"
+                                                               VerticalAlignment="Center"
+                                                               Margin="8,0,0,0" />
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1"
+                                                            Grid.Row="1"
+                                                            Margin="8,0,8,8"
+                                                            Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVisibility}}">
+                                                    <Border Background="{DynamicResource Bg.Surface}"
+                                                            CornerRadius="3"
+                                                            Height="6"
+                                                            Margin="0,2,0,6"
+                                                            Visibility="{Binding HasProgress, Converter={StaticResource BoolToVisibility}}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="{Binding ProgressTrack}" />
+                                                                <ColumnDefinition Width="{Binding RemainderTrack}" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Border Grid.Column="0"
+                                                                    Background="{DynamicResource Accent.Primary}"
+                                                                    CornerRadius="3" />
+                                                        </Grid>
+                                                    </Border>
+
+                                                    <TextBlock Text="{Binding ProgressText}"
+                                                               FontSize="{DynamicResource Font.Size.Caption}"
+                                                               Foreground="{DynamicResource Fg.Secondary}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Button x:Name="RankLadderToggle"
+                                        Style="{StaticResource Button.Link}"
+                                        FontSize="{DynamicResource Font.Size.Caption}"
+                                        Content="{Binding RankLadderToggleText}"
+                                        Command="{Binding ToggleRankLadderCommand}"
+                                        HorizontalAlignment="Left"
+                                        Margin="30,4,0,0"
+                                        Visibility="{Binding SelectedRow.RankLadder.CanCollapse, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <StackPanel Grid.Row="1"
+                                Visibility="{Binding HasSelectedRow, Converter={StaticResource BoolToVisibility}}">
+                        <Border Height="1"
+                                Background="{DynamicResource Border.Subtle}"
+                                Margin="0,16,0,0" />
+
+                        <Button x:Name="BalanceToggle"
+                                Style="{StaticResource Button.Ghost}"
+                                Command="{Binding ToggleBalanceCommand}"
+                                HorizontalAlignment="Left"
+                                MinHeight="0"
+                                Padding="6,4"
+                                Margin="-6,10,0,0"
+                                AutomationProperties.Name="{Binding BalanceToggleCaption}"
+                                ToolTip="{Binding BalanceToggleCaption}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Баланс"
+                                           Style="{StaticResource TextBlock.Heading}"
+                                           FontSize="{DynamicResource Font.Size.L}"
+                                           VerticalAlignment="Center" />
+
+                                <iconPacks:PackIconLucide Width="14"
+                                                          Height="14"
+                                                          Margin="8,0,0,0"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{DynamicResource Fg.Secondary}">
+                                    <iconPacks:PackIconLucide.Style>
+                                        <Style TargetType="iconPacks:PackIconLucide">
+                                            <Setter Property="Kind"
+                                                    Value="ChevronRight" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsBalanceExpanded}"
+                                                             Value="True">
+                                                    <Setter Property="Kind"
+                                                            Value="ChevronDown" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </iconPacks:PackIconLucide.Style>
+                                </iconPacks:PackIconLucide>
+                            </StackPanel>
+                        </Button>
+
+                        <StackPanel x:Name="BalanceBody"
+                                    Margin="0,8,0,0"
+                                    Visibility="{Binding IsBalanceExpanded, Converter={StaticResource BoolToVisibility}}">
+                            <UniformGrid Columns="4"
+                                         Margin="0,0,0,10">
+                                <Button Style="{StaticResource QuickAmountButton}"
+                                        Command="{Binding SetAdjustmentCommand}"
+                                        Content="−100"
+                                        Margin="0,0,6,0"
+                                        AutomationProperties.Name="Поставить минус сто баллов">
+                                    <Button.CommandParameter>
+                                        <sys:Double>-100</sys:Double>
+                                    </Button.CommandParameter>
+                                </Button>
+                                <Button Style="{StaticResource QuickAmountButton}"
+                                        Command="{Binding SetAdjustmentCommand}"
+                                        Content="−10"
+                                        Margin="0,0,6,0"
+                                        AutomationProperties.Name="Поставить минус десять баллов">
+                                    <Button.CommandParameter>
+                                        <sys:Double>-10</sys:Double>
+                                    </Button.CommandParameter>
+                                </Button>
+                                <Button Style="{StaticResource QuickAmountButton}"
+                                        Command="{Binding SetAdjustmentCommand}"
+                                        Content="+10"
+                                        Margin="0,0,6,0"
+                                        AutomationProperties.Name="Поставить плюс десять баллов">
+                                    <Button.CommandParameter>
+                                        <sys:Double>10</sys:Double>
+                                    </Button.CommandParameter>
+                                </Button>
+                                <Button Style="{StaticResource QuickAmountButton}"
+                                        Command="{Binding SetAdjustmentCommand}"
+                                        Content="+100"
+                                        AutomationProperties.Name="Поставить плюс сто баллов">
+                                    <Button.CommandParameter>
+                                        <sys:Double>100</sys:Double>
+                                    </Button.CommandParameter>
+                                </Button>
+                            </UniformGrid>
+
+                            <StackPanel x:Name="AdjustmentField"
+                                        Margin="0,0,0,12">
+                                <TextBlock Text="Изменение баланса"
+                                           Style="{StaticResource TextBlock.Subtle}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,4" />
+
+                                <Grid>
+                                    <TextBox x:Name="AdjustmentBox"
+                                             Text="{Binding AdjustmentText, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource AdjustmentInput}"
+                                             AutomationProperties.Name="Изменение баланса"
+                                             AutomationProperties.HelpText="{Binding AdjustmentError, TargetNullValue={x:Static sys:String.Empty}}" />
+                                    <UniformGrid Style="{StaticResource UniformGrid.Steppers}">
+                                        <RepeatButton Style="{StaticResource RepeatButton.StepperUp}"
+                                                      Command="{Binding IncreaseAdjustmentCommand}"
+                                                      AutomationProperties.Name="Увеличить">
+                                            <iconPacks:PackIconLucide Kind="ChevronUp"
+                                                                      Width="10"
+                                                                      Height="10" />
+                                        </RepeatButton>
+                                        <RepeatButton Style="{StaticResource RepeatButton.StepperDown}"
+                                                      Command="{Binding DecreaseAdjustmentCommand}"
+                                                      AutomationProperties.Name="Уменьшить">
+                                            <iconPacks:PackIconLucide Kind="ChevronDown"
+                                                                      Width="10"
+                                                                      Height="10" />
+                                        </RepeatButton>
+                                    </UniformGrid>
+                                </Grid>
+
+                                <TextBlock x:Name="AdjustmentErrorText"
+                                           Text="{Binding AdjustmentError}"
+                                           Foreground="{DynamicResource State.ErrorText}"
+                                           FontSize="{DynamicResource Font.Size.S}"
+                                           TextWrapping="Wrap"
+                                           Margin="2,4,0,0"
+                                           AutomationProperties.LiveSetting="Assertive"
+                                           Visibility="{Binding HasAdjustmentError, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+
+                            <Button x:Name="ApplyAdjustmentButton"
+                                    Content="{Binding ActionButtonText}"
+                                    Command="{Binding ApplyAdjustmentCommand}"
+                                    Style="{StaticResource Button.Primary}"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0"
+                                Grid.RowSpan="2"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding HasSelectedRow, Converter={StaticResource InverseBoolToVisibility}}">
+                        <iconPacks:PackIconLucide Kind="MousePointerClick"
+                                                  Width="20"
+                                                  Height="20"
+                                                  HorizontalAlignment="Center"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="Выберите участника в списке"
+                                   Style="{StaticResource TextBlock.Subtle}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

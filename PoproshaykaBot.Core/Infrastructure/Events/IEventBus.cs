@@ -1,4 +1,4 @@
-namespace PoproshaykaBot.Core.Infrastructure.Events;
+﻿namespace PoproshaykaBot.Core.Infrastructure.Events;
 
 public interface IEventBus
 {
@@ -13,4 +13,6 @@ public interface IEventBus
 
     IDisposable Subscribe<TEvent>(Action<TEvent> handler)
         where TEvent : IEvent;
+
+    void ContinueAfterPublish(Func<Task> continuation);
 }

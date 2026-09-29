@@ -1,4 +1,4 @@
-using PoproshaykaBot.Core.Broadcast.Profiles;
+﻿using PoproshaykaBot.Core.Broadcast.Profiles;
 using PoproshaykaBot.Core.Streaming;
 using System.Text.RegularExpressions;
 
@@ -10,7 +10,7 @@ internal static class BroadcastProfileStreamComparer
 
     public static bool ProfileDivergesFromStream(BroadcastProfile profile, StreamInfo? stream)
     {
-        if (stream == null)
+        if (stream is null or { IsBare: true })
         {
             return false;
         }

@@ -8,6 +8,8 @@ public interface IObsWebSocketClient : IAsyncDisposable
 
     bool IsConnected { get; }
 
+    DateTimeOffset? LastExchangeAt { get; }
+
     Task<ObsConnectionSnapshot> ConnectAsync(ObsConnectionOptions options, CancellationToken cancellationToken);
 
     Task DisconnectAsync(CancellationToken cancellationToken);

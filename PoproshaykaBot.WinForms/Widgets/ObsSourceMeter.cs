@@ -76,7 +76,7 @@ public sealed partial class ObsSourceMeter : UserControl
 
     private void SetState(string displayName, Color backColor, Color foreColor)
     {
-        _stateLabel.Text = string.IsNullOrWhiteSpace(displayName) ? "—" : displayName.Trim();
+        _stateLabel.Text = string.IsNullOrWhiteSpace(displayName) ? "–" : displayName.Trim();
         _stateLabel.BackColor = backColor;
         _stateLabel.ForeColor = foreColor;
     }

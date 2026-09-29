@@ -14,12 +14,15 @@ public static class AppPaths
     private static readonly Lazy<string?> _baseDirectoryOverride = new(ResolveBaseDirectoryOverride);
     private static readonly Lazy<bool> _isPortable = new(ResolvePortable);
     private static readonly Lazy<string> _baseDirectory = new(ResolveBaseDirectory);
+    private static readonly Lazy<string> _defaultBaseDirectory = new(ResolveDefaultBaseDirectory);
 
     public static bool IsPortable => _isPortable.Value;
 
     public static bool IsBaseDirectoryOverridden => _baseDirectoryOverride.Value is not null;
 
     public static string BaseDirectory => _baseDirectory.Value;
+
+    public static string DefaultBaseDirectory => _defaultBaseDirectory.Value;
 
     public static string SettingsDirectory => Path.Combine(BaseDirectory, SettingsFolderName);
 
@@ -75,6 +78,11 @@ public static class AppPaths
             return overridePath;
         }
 
+        return ResolveDefaultBaseDirectory();
+    }
+
+    private static string ResolveDefaultBaseDirectory()
+    {
         if (IsPortable)
         {
             return GetExecutableDirectory();

@@ -15,6 +15,7 @@
     --emote-size: 28px;
     --badge-size: 18px;
     --avatar-size: 32px;
+    --message-image-max-height: 160px;
 
     --broadcaster-color: #ff6b6b;
     --moderator-color: #51cf66;
@@ -472,6 +473,28 @@ body::-webkit-scrollbar {
     margin-top: 3px;
     color: var(--chat-text-color);
     text-shadow: var(--text-shadow);
+}
+
+.message-images {
+    margin-top: 4px;
+}
+
+.message-image {
+    display: block;
+    max-width: 100%;
+    max-height: var(--message-image-max-height);
+    border-radius: var(--chat-border-radius);
+    box-shadow: var(--shadow-small);
+    object-fit: contain;
+}
+
+.message.no-message-images .message-images {
+    display: none;
+}
+
+.message.has-message-image:not(.no-message-images) .message-image-link,
+.message.has-message-image:not(.no-message-images) .message-text.message-text-link-only {
+    display: none;
 }
 
 .system-message {

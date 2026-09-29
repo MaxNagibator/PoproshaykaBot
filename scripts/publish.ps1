@@ -17,6 +17,9 @@
 .PARAMETER Variant
     Варианты сборки: framework-dependent, portable. По умолчанию — оба.
 
+.PARAMETER UiHost
+    Хост интерфейса: Wpf (релизный) или WinForms (заморожен 14.09.2026). По умолчанию Wpf – как в release.yml.
+
 .PARAMETER OutputDir
     Куда сложить итоговые .exe и .zip. По умолчанию <repo>/artifacts.
 
@@ -24,6 +27,7 @@
     pwsh ./scripts/publish.ps1
     pwsh ./scripts/publish.ps1 -Arch x64 -Variant portable
     pwsh ./scripts/publish.ps1 -Version 3.0.0.4
+    pwsh ./scripts/publish.ps1 -UiHost WinForms -Arch x64
 #>
 
 [CmdletBinding()]
@@ -33,6 +37,8 @@ param(
     [string[]]$Arch = @('x64', 'x86'),
     [ValidateSet('framework-dependent', 'portable')]
     [string[]]$Variant = @('framework-dependent', 'portable'),
+    [ValidateSet('WinForms', 'Wpf')]
+    [string]$UiHost = 'Wpf',
     [string]$OutputDir
 )
 
@@ -40,21 +46,25 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
-$projectDir = Join-Path $repoRoot 'PoproshaykaBot.WinForms'
+$projectDir = Join-Path $repoRoot "PoproshaykaBot.$UiHost"
+$csprojPath = Join-Path $projectDir "PoproshaykaBot.$UiHost.csproj"
 $propsPath = Join-Path $repoRoot 'Directory.Build.props'
 
 if (-not $Version) {
     [xml]$props = Get-Content -LiteralPath $propsPath
-    $Version = $props.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
-    if (-not $Version) {
+    $versionNode = $props.SelectSingleNode('/Project/PropertyGroup/Version')
+    if (-not $versionNode) {
         throw "Не удалось извлечь <Version> из $propsPath."
     }
+
+    $Version = $versionNode.InnerText.Trim()
 }
 
 if (-not $OutputDir) {
     $OutputDir = Join-Path $repoRoot 'artifacts'
 }
 
+Write-Output "Хост: $UiHost"
 Write-Output "Версия: $Version"
 Write-Output "Архитектуры: $($Arch -join ', ')"
 Write-Output "Варианты: $($Variant -join ', ')"
@@ -76,6 +86,7 @@ function Invoke-DotnetPublish {
     $variantDir = Join-Path $publishRoot $Variant
     $publishArgs = @(
         'publish',
+        $csprojPath,
         '--configuration', 'Release',
         '--runtime', "win-$Arch",
         '--output', $variantDir,
@@ -98,18 +109,12 @@ function Invoke-DotnetPublish {
 
     Write-Output ""
     Write-Output "==> dotnet $($publishArgs -join ' ')"
-    Push-Location $projectDir
-    try {
-        & dotnet @publishArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw "dotnet publish завершился с кодом $LASTEXITCODE (arch=$Arch, variant=$Variant)."
-        }
-    }
-    finally {
-        Pop-Location
+    & dotnet @publishArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish завершился с кодом $LASTEXITCODE (arch=$Arch, variant=$Variant)."
     }
 
-    $sourceExe = Join-Path $variantDir 'PoproshaykaBot.WinForms.exe'
+    $sourceExe = Join-Path $variantDir "PoproshaykaBot.$UiHost.exe"
     if (-not (Test-Path -LiteralPath $sourceExe)) {
         throw "Ожидаемый файл не найден: $sourceExe"
     }
@@ -147,7 +152,6 @@ function Write-ReleaseMetadata {
     }
     Set-Content -LiteralPath $sumsPath -Value $lines -Encoding ascii
 
-    $csprojPath = Join-Path $projectDir 'PoproshaykaBot.WinForms.csproj'
     $tfm = (Select-String -LiteralPath $csprojPath -Pattern '<TargetFramework>(.*?)</TargetFramework>').Matches[0].Groups[1].Value
     $runtimePath = Join-Path $OutputDir "RUNTIME-$Arch.txt"
     Set-Content -LiteralPath $runtimePath -Value $tfm -Encoding ascii -NoNewline

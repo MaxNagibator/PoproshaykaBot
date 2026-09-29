@@ -1,13 +1,16 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Infrastructure;
 using PoproshaykaBot.Core.Infrastructure.Hosting;
 using PoproshaykaBot.Core.Infrastructure.Persistence;
 using PoproshaykaBot.Core.Settings.Stores;
+using PoproshaykaBot.Core.Statistics;
 using PoproshaykaBot.Core.Twitch;
 using PoproshaykaBot.Core.Twitch.Helix;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace PoproshaykaBot.Core.Polls;
 
@@ -16,6 +19,7 @@ public sealed class PollHistoryStore(
     [FromKeyedServices(TwitchEndpoints.HelixBroadcasterClient)]
     ITwitchHelixClient helix,
     IBroadcasterIdProvider broadcasterIdProvider,
+    ITargetChannelProvider targetChannelProvider,
     ILogger<PollHistoryStore> logger,
     string? filePath = null)
     : IHostedComponent
@@ -25,6 +29,10 @@ public sealed class PollHistoryStore(
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver
+        {
+            Modifiers = { JsonStoreNullDefaults.Apply },
+        },
     };
 
     private readonly string _filePath = filePath ?? AppPaths.Combine("polls-history.json");
@@ -33,11 +41,25 @@ public sealed class PollHistoryStore(
     private readonly object _sync = new();
     private CancellationTokenSource? _backgroundCts;
     private Task? _backgroundTask;
-    private bool _loaded;
+    private StatisticsLoadState _readState = StatisticsLoadState.NotRead;
+    private bool _canPersist;
+    private bool _rewrittenExternally;
+    private bool _hasUnsavedChanges;
 
     public string Name => "История голосований";
 
     public int StartOrder => 120;
+
+    public bool IsLoaded
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _canPersist;
+            }
+        }
+    }
 
     public static PollHistoryEntry BuildEntry(PollSnapshot snapshot, PollChoiceSnapshot? winner, bool winnerIsTie)
     {
@@ -68,10 +90,9 @@ public sealed class PollHistoryStore(
 
     public IReadOnlyList<PollHistoryEntry> GetAll()
     {
-        EnsureLoaded();
-
         lock (_sync)
         {
+            EnsureLoadedUnderLock();
             return _entries.ToList();
         }
     }
@@ -79,10 +100,11 @@ public sealed class PollHistoryStore(
     public bool TryAdd(PollHistoryEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        EnsureLoaded();
 
         lock (_sync)
         {
+            EnsureLoadedUnderLock();
+
             if (_entries.Any(e => string.Equals(e.PollId, entry.PollId, StringComparison.Ordinal)))
             {
                 return false;
@@ -90,14 +112,81 @@ public sealed class PollHistoryStore(
 
             _entries.Add(entry);
             TruncateToMax();
+            _hasUnsavedChanges = true;
+
+            if (!_canPersist)
+            {
+                logger.LogWarning(
+                    "PollHistoryStore: {Reason} ({FilePath}), файл не переписывается – запись опроса {PollId} остаётся в памяти и попадёт в файл, только если право записи вернётся до перезапуска",
+                    DescribeLostWriteRight(),
+                    _filePath,
+                    entry.PollId);
+
+                return true;
+            }
+
             PersistNoThrow();
             return true;
+        }
+    }
+
+    public bool Invalidate()
+    {
+        lock (_sync)
+        {
+            EnsureLoadedUnderLock();
+
+            if (!_canPersist)
+            {
+                return false;
+            }
+
+            _canPersist = false;
+            _rewrittenExternally = true;
+
+            logger.LogInformation(
+                "PollHistoryStore: файл {FilePath} меняют мимо приложения, история голосований этого сеанса до перезапуска не сохраняется",
+                _filePath);
+
+            return true;
+        }
+    }
+
+    public void Restore(bool wasLoaded)
+    {
+        if (!wasLoaded)
+        {
+            return;
+        }
+
+        lock (_sync)
+        {
+            _canPersist = true;
+            _rewrittenExternally = false;
+
+            logger.LogInformation("PollHistoryStore: файл {FilePath} никто не менял, история голосований снова сохраняется", _filePath);
+
+            FlushUnsavedChanges();
+        }
+    }
+
+    public bool TryFlush()
+    {
+        lock (_sync)
+        {
+            return _canPersist ? FlushUnsavedChanges() : !_hasUnsavedChanges;
         }
     }
 
     public async Task<int> BackfillAsync(CancellationToken cancellationToken)
     {
         EnsureLoaded();
+
+        if (targetChannelProvider.Current.IsForeign)
+        {
+            logger.LogInformation("PollHistoryStore: бэкфилл пропущен – идёт отладка на чужом канале");
+            return 0;
+        }
 
         try
         {
@@ -108,7 +197,7 @@ public sealed class PollHistoryStore(
                 return 0;
             }
 
-            var polls = await helix.GetPollsAsync(broadcasterId, null, 20, cancellationToken);
+            var polls = await helix.GetPollsAsync(broadcasterId, 20, cancellationToken);
             var added = 0;
 
             foreach (var poll in polls)
@@ -119,6 +208,14 @@ public sealed class PollHistoryStore(
                 }
 
                 var snapshot = PollEventSubMapper.FromHelix(poll, null);
+
+                if (snapshot is null)
+                {
+                    logger.LogWarning("PollHistoryStore: опрос {PollId} – неизвестный статус {Status}, пропущен",
+                        poll.Id, poll.Status);
+
+                    continue;
+                }
 
                 if (snapshot.Status == PollSnapshotStatus.Active)
                 {
@@ -188,39 +285,89 @@ public sealed class PollHistoryStore(
     {
         lock (_sync)
         {
-            if (_loaded)
+            EnsureLoadedUnderLock();
+        }
+    }
+
+    private void EnsureLoadedUnderLock()
+    {
+        if (_readState != StatisticsLoadState.NotRead)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!File.Exists(_filePath))
             {
+                _readState = StatisticsLoadState.Loaded;
+                _canPersist = true;
                 return;
             }
 
-            _loaded = true;
+            var json = File.ReadAllText(_filePath);
+            var file = JsonSerializer.Deserialize<HistoryFile>(json, JsonOptions);
 
-            try
+            if (file is null)
             {
-                if (!File.Exists(_filePath))
-                {
-                    return;
-                }
-
-                var json = File.ReadAllText(_filePath);
-
-                if (string.IsNullOrWhiteSpace(json))
-                {
-                    return;
-                }
-
-                var file = JsonSerializer.Deserialize<HistoryFile>(json, JsonOptions);
-
-                if (file?.Entries is { Count: > 0 })
-                {
-                    _entries.AddRange(file.Entries);
-                }
+                logger.LogError("PollHistoryStore: файл {FilePath} разобран в пустое значение, история голосований этого сеанса не сохраняется", _filePath);
+                Abandon();
+                return;
             }
-            catch (Exception ex)
+
+            if (file.Entries is { Count: > 0 })
             {
-                logger.LogError(ex, "PollHistoryStore: ошибка чтения {FilePath}", _filePath);
+                _entries.AddRange(file.Entries);
             }
+
+            _readState = StatisticsLoadState.Loaded;
+            _canPersist = true;
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "PollHistoryStore: ошибка чтения {FilePath}, история голосований этого сеанса не сохраняется", _filePath);
+            Abandon();
+        }
+    }
+
+    private void Abandon()
+    {
+        _readState = StatisticsLoadState.Abandoned;
+        _entries.Clear();
+
+        JsonStoreBackup.CreateBackup(_filePath, "invalid", logger);
+    }
+
+    private string DescribeLostWriteRight()
+    {
+        return _rewrittenExternally ? "файл переписан мимо приложения" : "чтение файла сорвалось";
+    }
+
+    private bool FlushUnsavedChanges()
+    {
+        if (!_hasUnsavedChanges)
+        {
+            return true;
+        }
+
+        try
+        {
+            Persist();
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception,
+                "PollHistoryStore: не удалось записать {FilePath} – несохранённое осталось в памяти до следующей попытки",
+                _filePath);
+
+            return false;
+        }
+
+        logger.LogInformation("PollHistoryStore: несохранённое дописано в {FilePath} (всего записей: {EntryCount})",
+            _filePath,
+            _entries.Count);
+
+        return true;
     }
 
     private void TruncateToMax()
@@ -239,14 +386,20 @@ public sealed class PollHistoryStore(
     {
         try
         {
-            var payload = new HistoryFile(1, _entries);
-            var json = JsonSerializer.Serialize(payload, JsonOptions);
-            AtomicFile.Save(_filePath, json, logger);
+            Persist();
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "PollHistoryStore: не удалось сохранить историю");
+            logger.LogError(ex, "PollHistoryStore: не удалось сохранить историю – несохранённое осталось в памяти до ближайшей попытки записи");
         }
+    }
+
+    private void Persist()
+    {
+        var payload = new HistoryFile(1, _entries);
+        var json = JsonSerializer.Serialize(payload, JsonOptions);
+        AtomicFile.Save(_filePath, json, logger);
+        _hasUnsavedChanges = false;
     }
 
     private sealed record HistoryFile(int Version, List<PollHistoryEntry> Entries);

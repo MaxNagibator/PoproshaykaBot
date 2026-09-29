@@ -1,11 +1,15 @@
 ﻿using PoproshaykaBot.Core.Chat;
+using PoproshaykaBot.Core.Server.Images;
+using PoproshaykaBot.Core.Settings.Obs;
 
 namespace PoproshaykaBot.Core.Server;
 
 public static class DtoMapper
 {
-    public static object ToServerMessage(ChatMessageData chatMessage)
+    public static object ToServerMessage(ChatMessageData chatMessage, ObsChatSettings obsChatSettings)
     {
+        var images = MessageImagePolicy.BuildImages(chatMessage, obsChatSettings);
+
         return new
         {
             messageId = chatMessage.MessageId,
@@ -32,6 +36,13 @@ public static class DtoMapper
                     type = b.Key,
                     version = b.Value,
                     imageUrl = chatMessage.BadgeUrls.GetValueOrDefault($"{b.Key}/{b.Value}", ""),
+                })
+                .ToArray(),
+            images = images.Select(i => i.Url).ToArray(),
+            imageLinks = images.Select(i => new
+                {
+                    startIndex = i.StartIndex,
+                    endIndex = i.EndIndex,
                 })
                 .ToArray(),
         };

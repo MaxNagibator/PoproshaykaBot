@@ -49,7 +49,7 @@ public class GameCommandTests
     public async Task Execute_GameFound_AppliesPatchAndReturnsConfirmation()
     {
         _resolver.ResolveAsync("dota", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<GameSuggestion?>(new("1", "Dota 2", "")));
+            .Returns(new GameCategoryResolution(new("1", "Dota 2", ""), [new("1", "Dota 2", "")]));
 
         var response = await _command.ExecuteAsync(new()
         {
@@ -71,7 +71,7 @@ public class GameCommandTests
     public async Task Execute_GameNotFound_DoesNotCallApplier()
     {
         _resolver.ResolveAsync("unknown", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<GameSuggestion?>(null));
+            .Returns(new GameCategoryResolution(null, []));
 
         var response = await _command.ExecuteAsync(new()
         {
@@ -82,5 +82,22 @@ public class GameCommandTests
 
         await _applier.DidNotReceiveWithAnyArgs().ApplyPatchAsync(null, null, null, CancellationToken.None);
         Assert.That(response!.Text, Does.Contain("unknown"));
+    }
+
+    [Test]
+    public async Task Execute_OnlyUnrelatedCandidates_DoesNotCallApplierAndNamesThem()
+    {
+        _resolver.ResolveAsync("tarkov", Arg.Any<CancellationToken>())
+            .Returns(new GameCategoryResolution(null, [new("1", "Tarot", ""), new("2", "Tarkan", "")]));
+
+        var response = await _command.ExecuteAsync(new()
+        {
+            IsBroadcaster = true,
+            MessageId = "m1",
+            Arguments = ["tarkov"],
+        }, CancellationToken.None);
+
+        await _applier.DidNotReceiveWithAnyArgs().ApplyPatchAsync(null, null, null, CancellationToken.None);
+        Assert.That(response!.Text, Does.Contain("tarkov").And.Contain("Tarot, Tarkan"));
     }
 }

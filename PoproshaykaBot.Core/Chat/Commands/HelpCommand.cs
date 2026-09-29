@@ -1,7 +1,18 @@
 ﻿namespace PoproshaykaBot.Core.Chat.Commands;
 
-public sealed class HelpCommand(Func<IReadOnlyCollection<IChatCommand>> getAllCommands) : IChatCommand
+public sealed class HelpCommand : IChatCommand
 {
+    private readonly Func<IReadOnlyCollection<IChatCommand>> _getAvailableCommands;
+    private readonly string _prefix;
+
+    public HelpCommand(Func<IReadOnlyCollection<IChatCommand>> getAvailableCommands, string prefix)
+    {
+        ArgumentNullException.ThrowIfNull(getAvailableCommands);
+
+        _getAvailableCommands = getAvailableCommands;
+        _prefix = string.IsNullOrWhiteSpace(prefix) ? ChatCommandProcessor.DefaultPrefix : prefix;
+    }
+
     public string Canonical => "помощь";
     public IReadOnlyCollection<string> Aliases => ["help", "h"];
     public string Description => "список команд";
@@ -13,11 +24,17 @@ public sealed class HelpCommand(Func<IReadOnlyCollection<IChatCommand>> getAllCo
 
     public Task<OutgoingMessage?> ExecuteAsync(CommandContext context, CancellationToken cancellationToken)
     {
-        var allCommands = getAllCommands();
+        var allCommands = _getAvailableCommands();
 
         if (context.Arguments.Count > 0)
         {
-            var targetToken = context.Arguments[0].TrimStart('!');
+            var targetToken = context.Arguments[0];
+
+            while (targetToken.StartsWith(_prefix, StringComparison.Ordinal))
+            {
+                targetToken = targetToken[_prefix.Length..];
+            }
+
             var command = allCommands.FirstOrDefault(x =>
                 string.Equals(x.Canonical, targetToken, StringComparison.OrdinalIgnoreCase)
                 || x.Aliases.Any(a => string.Equals(a, targetToken, StringComparison.OrdinalIgnoreCase)));
@@ -25,17 +42,17 @@ public sealed class HelpCommand(Func<IReadOnlyCollection<IChatCommand>> getAllCo
             if (command != null)
             {
                 var aliases = command.Aliases.Count > 0
-                    ? $" (алиасы: {string.Join(", ", command.Aliases.Select(x => "!" + x))})"
+                    ? $" (алиасы: {string.Join(", ", command.Aliases.Select(x => _prefix + x))})"
                     : string.Empty;
 
-                var text = $"❓ !{command.Canonical}: {command.Description}{aliases}";
+                var text = $"❓ {_prefix}{command.Canonical}: {command.Description}{aliases}";
                 return Task.FromResult<OutgoingMessage?>(OutgoingMessage.Reply(text, context.MessageId));
             }
         }
 
         var commandNames = allCommands
             .OrderBy(x => x.Canonical, StringComparer.OrdinalIgnoreCase)
-            .Select(x => $"!{x.Canonical}")
+            .Select(x => _prefix + x.Canonical)
             .ToList();
 
         if (commandNames.Count == 0)

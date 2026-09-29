@@ -16,7 +16,7 @@ public sealed class FarewellMessageHandlerTests
         _channelProvider = Substitute.For<IChannelProvider>();
         _channelProvider.Channel.Returns("qp_illson");
 
-        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance);
+        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance, null, null);
         _settings = new();
         _settingsManager.Current.Returns(_settings);
 

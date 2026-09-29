@@ -34,12 +34,23 @@ public sealed class UpdateInstaller(
         logger.LogInformation("Загрузка обновления {Version} из {Url}",
             candidate.Version, candidate.Asset.DownloadUrl);
 
-        await client
-            .DownloadFileAsync(candidate.Asset.DownloadUrl, partPath, progress, cancellationToken)
-            .ConfigureAwait(false);
+        string expectedHash;
+        string actualHash;
 
-        var expectedHash = await ResolveExpectedHashAsync(candidate, cancellationToken).ConfigureAwait(false);
-        var actualHash = await ComputeSha256Async(partPath, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await client
+                .DownloadFileAsync(candidate.Asset.DownloadUrl, partPath, progress, cancellationToken)
+                .ConfigureAwait(false);
+
+            expectedHash = await ResolveExpectedHashAsync(candidate, cancellationToken).ConfigureAwait(false);
+            actualHash = await ComputeSha256Async(partPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            TryDelete(partPath);
+            throw;
+        }
 
         if (!string.Equals(expectedHash, actualHash, StringComparison.OrdinalIgnoreCase))
         {
@@ -94,6 +105,20 @@ public sealed class UpdateInstaller(
             logger.LogError(exception, "Не удалось прочитать {PendingPath}", pendingPath);
             return null;
         }
+    }
+
+    public bool DiscardPending(string version)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(version);
+
+        var pending = ReadPending();
+
+        if (pending is null || !string.Equals(pending.Version, version, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return UpdateApplier.DiscardFiles(environment.StagingDirectory, pending, logger);
     }
 
     private static string BuildChecksumsUrl(string assetUrl, string architectureMoniker)

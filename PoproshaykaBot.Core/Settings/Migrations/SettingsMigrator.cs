@@ -10,11 +10,12 @@ public static class SettingsMigrator
     private const string BotAccountKey = "botAccount";
     private const string BroadcasterAccountKey = "broadcasterAccount";
 
-    public static bool TryMigrate(JsonObject root, ILogger? logger = null, string? baseDirectory = null)
+    public static SettingsMigrationResult Migrate(JsonObject root, ILogger? logger = null, string? baseDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(root);
 
         var changed = false;
+        var splitFiles = new List<string>();
 
         if (root["twitch"] is JsonObject twitch)
         {
@@ -25,31 +26,31 @@ public static class SettingsMigrator
 
         if (baseDirectory != null)
         {
-            changed |= SplitMonolithicSettings(root, baseDirectory, logger);
+            changed |= SplitMonolithicSettings(root, baseDirectory, splitFiles, logger);
         }
 
-        return changed;
+        return new(changed, splitFiles);
     }
 
-    private static bool SplitMonolithicSettings(JsonObject root, string baseDirectory, ILogger? logger)
+    private static bool SplitMonolithicSettings(JsonObject root, string baseDirectory, List<string> splitFiles, ILogger? logger)
     {
         var changed = false;
 
         if (root["twitch"] is JsonObject twitch)
         {
-            changed |= SplitAccounts(twitch, baseDirectory, logger);
-            changed |= TrySplitObject(twitch, "broadcastProfiles", baseDirectory, "broadcast-profiles.json", logger);
-            changed |= TrySplitObject(twitch, "polls", baseDirectory, "polls.json", logger);
-            changed |= SplitRecentCategories(twitch, baseDirectory, logger);
-            changed |= TrySplitObject(twitch, "obsChat", baseDirectory, "obs-chat.json", logger);
+            changed |= SplitAccounts(twitch, baseDirectory, splitFiles, logger);
+            changed |= TrySplitObject(twitch, "broadcastProfiles", baseDirectory, "broadcast-profiles.json", splitFiles, logger);
+            changed |= TrySplitObject(twitch, "polls", baseDirectory, "polls.json", splitFiles, logger);
+            changed |= SplitRecentCategories(twitch, baseDirectory, splitFiles, logger);
+            changed |= TrySplitObject(twitch, "obsChat", baseDirectory, "obs-chat.json", splitFiles, logger);
         }
 
-        changed |= SplitDashboardLayout(root, baseDirectory, logger);
+        changed |= SplitDashboardLayout(root, baseDirectory, splitFiles, logger);
 
         return changed;
     }
 
-    private static bool SplitAccounts(JsonObject twitch, string baseDirectory, ILogger? logger)
+    private static bool SplitAccounts(JsonObject twitch, string baseDirectory, List<string> splitFiles, ILogger? logger)
     {
         var botAccount = twitch[BotAccountKey] as JsonObject;
         var broadcasterAccount = twitch[BroadcasterAccountKey] as JsonObject;
@@ -69,6 +70,7 @@ public static class SettingsMigrator
         if (!TryWriteSplit(accountsTarget,
                 dto.ToJsonString(JsonStoreOptions.Default),
                 "accounts.json",
+                splitFiles,
                 logger,
                 AccountsTokenRedactor.Redact))
         {
@@ -81,7 +83,7 @@ public static class SettingsMigrator
         return changed;
     }
 
-    private static bool SplitRecentCategories(JsonObject twitch, string baseDirectory, ILogger? logger)
+    private static bool SplitRecentCategories(JsonObject twitch, string baseDirectory, List<string> splitFiles, ILogger? logger)
     {
         if (twitch["infrastructure"] is not JsonObject infrastructure
             || infrastructure["recentCategories"] is not JsonArray recentCategories)
@@ -95,11 +97,11 @@ public static class SettingsMigrator
             ["items"] = recentCategories.DeepClone(),
         };
 
-        return TryWriteSplit(target, dto.ToJsonString(JsonStoreOptions.Default), "recent-categories.json", logger)
+        return TryWriteSplit(target, dto.ToJsonString(JsonStoreOptions.Default), "recent-categories.json", splitFiles, logger)
                && infrastructure.Remove("recentCategories");
     }
 
-    private static bool SplitDashboardLayout(JsonObject root, string baseDirectory, ILogger? logger)
+    private static bool SplitDashboardLayout(JsonObject root, string baseDirectory, List<string> splitFiles, ILogger? logger)
     {
         if (root["ui"] is not JsonObject ui
             || !ui.ContainsKey("dashboard") && !ui.ContainsKey("mainWindow"))
@@ -114,11 +116,17 @@ public static class SettingsMigrator
             ["mainWindow"] = ui["mainWindow"]?.DeepClone(),
         };
 
-        return TryWriteSplit(target, dto.ToJsonString(JsonStoreOptions.Default), "dashboard-layout.json", logger)
+        return TryWriteSplit(target, dto.ToJsonString(JsonStoreOptions.Default), "dashboard-layout.json", splitFiles, logger)
                && root.Remove("ui");
     }
 
-    private static bool TrySplitObject(JsonObject parent, string key, string baseDirectory, string targetFileName, ILogger? logger)
+    private static bool TrySplitObject(
+        JsonObject parent,
+        string key,
+        string baseDirectory,
+        string targetFileName,
+        List<string> splitFiles,
+        ILogger? logger)
     {
         if (parent[key] is not JsonObject value)
         {
@@ -127,7 +135,7 @@ public static class SettingsMigrator
 
         var target = Path.Combine(baseDirectory, targetFileName);
 
-        if (!TryWriteSplit(target, value.DeepClone()!.ToJsonString(JsonStoreOptions.Default), targetFileName, logger))
+        if (!TryWriteSplit(target, value.DeepClone()!.ToJsonString(JsonStoreOptions.Default), targetFileName, splitFiles, logger))
         {
             return false;
         }
@@ -139,6 +147,7 @@ public static class SettingsMigrator
         string target,
         string content,
         string targetFileName,
+        List<string> splitFiles,
         ILogger? logger,
         Func<string, string>? backupRedactor = null)
     {
@@ -147,11 +156,12 @@ public static class SettingsMigrator
             if (File.Exists(target))
             {
                 JsonStoreBackup.CreateBackup(target, "pre-migration", logger, backupRedactor);
-                logger?.LogWarning("Миграция настроек: целевой {TargetFileName} уже существовал — создан бэкап перед перезаписью авторитетным источником из settings.json",
+                logger?.LogWarning("Миграция настроек: целевой {TargetFileName} уже существовал – создан бэкап перед перезаписью авторитетным источником из settings.json",
                     targetFileName);
             }
 
-            AtomicFile.Save(target, content, logger);
+            AtomicFile.Save(target, content, logger, keepBackup: backupRedactor == null);
+            splitFiles.Add(targetFileName);
             logger?.LogInformation("Миграция настроек: данные из settings.json вынесены в {TargetFileName}",
                 targetFileName);
 
@@ -160,7 +170,7 @@ public static class SettingsMigrator
         catch (Exception exception)
         {
             logger?.LogError(exception,
-                "Миграция настроек: не удалось записать {TargetFileName} — легаси-поле в settings.json оставлено без изменений",
+                "Миграция настроек: не удалось записать {TargetFileName} – легаси-поле в settings.json оставлено без изменений",
                 targetFileName);
 
             return false;

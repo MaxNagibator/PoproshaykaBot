@@ -13,6 +13,8 @@ public sealed class FormFactory(IServiceScopeFactory scopeFactory) : IFormFactor
 
         form.Disposed += (_, _) => scope.Dispose();
 
+        OffScreenForm.PrepareIfHeadless(form);
+
         return form;
     }
 }

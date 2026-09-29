@@ -44,7 +44,7 @@ public sealed class TopStreamsCommand(StreamSessionHistoryStore historyStore) : 
             }
         }
 
-        var sessions = historyStore.Load().Sessions;
+        var sessions = historyStore.LoadVisible().Sessions;
 
         if (sessions.Count == 0)
         {

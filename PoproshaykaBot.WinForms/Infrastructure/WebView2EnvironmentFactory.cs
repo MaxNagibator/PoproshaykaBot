@@ -30,7 +30,7 @@ public static class WebView2EnvironmentFactory
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
                     logger.LogDebug(exception,
-                        "Папка данных WebView2 {Folder} недоступна (попытка {Attempt}/{Max}), повтор через {Delay} мс — вероятно, занята завершающимся процессом после обновления",
+                        "Папка данных WebView2 {Folder} недоступна (попытка {Attempt}/{Max}), повтор через {Delay} мс – вероятно, занята завершающимся процессом после обновления",
                         userDataFolder, attempt, MaxAttempts, RetryDelayMs);
                 }
 

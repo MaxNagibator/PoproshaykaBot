@@ -107,7 +107,7 @@ public sealed class StreamStatusWatchdog : IStreamHostedComponent, IAsyncDisposa
             }
             catch
             {
-                // disposing — swallow any leftover failure
+                // disposing – swallow any leftover failure
             }
         }
 

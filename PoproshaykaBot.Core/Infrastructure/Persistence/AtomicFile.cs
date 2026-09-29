@@ -1,14 +1,30 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace PoproshaykaBot.Core.Infrastructure.Persistence;
 
 public static class AtomicFile
 {
-    public static void Save(string targetPath, string content, ILogger? logger = null)
+    public static void Save(string targetPath, string content, ILogger? logger = null, bool keepBackup = true)
     {
         ArgumentException.ThrowIfNullOrEmpty(targetPath);
         ArgumentNullException.ThrowIfNull(content);
+
+        Save(targetPath, tempPath => File.WriteAllText(tempPath, content, Encoding.UTF8), logger, keepBackup);
+    }
+
+    public static void Save(string targetPath, byte[] content, ILogger? logger = null, bool keepBackup = true)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(targetPath);
+        ArgumentNullException.ThrowIfNull(content);
+
+        Save(targetPath, tempPath => File.WriteAllBytes(tempPath, content), logger, keepBackup);
+    }
+
+    public static void Save(string targetPath, Action<string> writeTemporary, ILogger? logger = null, bool keepBackup = true)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(targetPath);
+        ArgumentNullException.ThrowIfNull(writeTemporary);
 
         var directory = Path.GetDirectoryName(targetPath);
 
@@ -17,35 +33,45 @@ public static class AtomicFile
             Directory.CreateDirectory(directory);
         }
 
-        try
-        {
-            WriteAtomic(targetPath, content, logger);
-        }
-        catch
-        {
-            TryRestoreFromBackup(targetPath, logger);
-            throw;
-        }
+        WriteAtomic(targetPath, writeTemporary, logger, keepBackup);
     }
 
-    private static void WriteAtomic(string targetPath, string content, ILogger? logger)
+    private static void WriteAtomic(string targetPath, Action<string> writeTemporary, ILogger? logger, bool keepBackup)
     {
         var tempPath = targetPath + ".tmp";
+        var backupPath = targetPath + ".bak";
 
-        File.WriteAllText(tempPath, content, Encoding.UTF8);
+        writeTemporary(tempPath);
 
         if (File.Exists(targetPath))
         {
-            var backupPath = targetPath + ".bak";
             File.Copy(targetPath, backupPath, true);
 
             var oldPath = targetPath + ".old";
-            File.Replace(tempPath, targetPath, oldPath);
+            ReplaceTarget(tempPath, targetPath, oldPath, logger);
             TryDelete(oldPath, logger);
         }
         else
         {
             File.Move(tempPath, targetPath);
+        }
+
+        if (!keepBackup)
+        {
+            TryDelete(backupPath, logger);
+        }
+    }
+
+    private static void ReplaceTarget(string tempPath, string targetPath, string oldPath, ILogger? logger)
+    {
+        try
+        {
+            File.Replace(tempPath, targetPath, oldPath);
+        }
+        catch
+        {
+            TryRestoreFromBackup(targetPath, logger);
+            throw;
         }
     }
 

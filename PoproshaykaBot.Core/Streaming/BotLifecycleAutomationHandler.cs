@@ -14,23 +14,26 @@ public sealed class BotLifecycleAutomationHandler :
     IEventSubscriber,
     IDisposable
 {
-    private readonly BotConnectionManager _connectionManager;
+    private readonly IBotConnectionController _connectionManager;
     private readonly SettingsManager _settingsManager;
+    private readonly IEventBus _eventBus;
     private readonly ILogger<BotLifecycleAutomationHandler> _logger;
     private readonly IDisposable _onlineSubscription;
     private readonly IDisposable _offlineSubscription;
     private readonly IDisposable _phaseSubscription;
 
     private BotLifecyclePhase _phase = BotLifecyclePhase.Idle;
+    private volatile bool _isStreamOnline;
 
     public BotLifecycleAutomationHandler(
-        BotConnectionManager connectionManager,
+        IBotConnectionController connectionManager,
         SettingsManager settingsManager,
         IEventBus eventBus,
         ILogger<BotLifecycleAutomationHandler> logger)
     {
         _connectionManager = connectionManager;
         _settingsManager = settingsManager;
+        _eventBus = eventBus;
         _logger = logger;
 
         _onlineSubscription = eventBus.Subscribe<StreamWentOnline>(this);
@@ -46,6 +49,8 @@ public sealed class BotLifecycleAutomationHandler :
 
     public Task HandleAsync(StreamWentOnline @event, CancellationToken cancellationToken)
     {
+        _isStreamOnline = true;
+
         var settings = _settingsManager.Current.Twitch.BotLifecycleAutomation;
 
         if (!settings.AutoConnectOnStreamOnline)
@@ -67,7 +72,7 @@ public sealed class BotLifecycleAutomationHandler :
 
         try
         {
-            _logger.LogInformation("🔴 Стрим онлайн ({Channel}) — автоматически подключаю бота", @event.Channel);
+            _logger.LogInformation("🔴 Стрим онлайн ({Channel}) – автоматически подключаю бота", @event.Channel);
             _connectionManager.StartConnection();
         }
         catch (InvalidOperationException exception)
@@ -80,6 +85,8 @@ public sealed class BotLifecycleAutomationHandler :
 
     public Task HandleAsync(StreamWentOffline @event, CancellationToken cancellationToken)
     {
+        _isStreamOnline = false;
+
         var settings = _settingsManager.Current.Twitch.BotLifecycleAutomation;
 
         if (!settings.AutoDisconnectOnStreamOffline)
@@ -99,19 +106,9 @@ public sealed class BotLifecycleAutomationHandler :
             return Task.CompletedTask;
         }
 
-        _logger.LogInformation("⚫ Стрим офлайн ({Channel}) — автоматически отключаю бота", @event.Channel);
+        _logger.LogInformation("⚫ Стрим офлайн ({Channel}) – автоматически отключаю бота", @event.Channel);
 
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await _connectionManager.StopAsync();
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Ошибка авто-отключения бота");
-            }
-        });
+        _eventBus.ContinueAfterPublish(StopBotAsync);
 
         return Task.CompletedTask;
     }
@@ -121,6 +118,24 @@ public sealed class BotLifecycleAutomationHandler :
         _onlineSubscription.Dispose();
         _offlineSubscription.Dispose();
         _phaseSubscription.Dispose();
+    }
+
+    private async Task StopBotAsync()
+    {
+        if (_isStreamOnline)
+        {
+            _logger.LogInformation("Авто-отключение отменено: стрим снова онлайн");
+            return;
+        }
+
+        try
+        {
+            await _connectionManager.StopAsync(BotStopMode.Graceful);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Ошибка авто-отключения бота");
+        }
     }
 
     private static bool IsDisconnectedPhase(BotLifecyclePhase phase)

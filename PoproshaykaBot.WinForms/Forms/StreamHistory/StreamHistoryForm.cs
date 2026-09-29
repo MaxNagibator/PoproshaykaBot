@@ -7,7 +7,7 @@ namespace PoproshaykaBot.WinForms.Forms.StreamHistory;
 
 public sealed partial class StreamHistoryForm : Form
 {
-    private const string MissingValuePlaceholder = "—";
+    private const string MissingValuePlaceholder = "–";
     private const int ColumnStarted = 0;
 
     private static readonly CultureInfo RussianCulture = CultureInfo.GetCultureInfo("ru-RU");
@@ -186,7 +186,7 @@ public sealed partial class StreamHistoryForm : Form
         labelChatters.Text = $"👥 Чаттеров: {(session != null ? FormatNumber(session.ChatterCount) : MissingValuePlaceholder)}";
         labelViewers.Text = session != null
             ? $"👁 Зрители: пик {FormatNumber(session.PeakViewers)} / средн. {FormatNumber(session.AverageViewers)}"
-            : "👁 Зрители: пик — / средн. —";
+            : "👁 Зрители: пик – / средн. –";
 
         listViewSegments.BeginUpdate();
         listViewSegments.Items.Clear();

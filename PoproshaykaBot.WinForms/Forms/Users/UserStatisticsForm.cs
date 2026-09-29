@@ -3,6 +3,7 @@ using PoproshaykaBot.Core.Infrastructure;
 using PoproshaykaBot.Core.Settings;
 using PoproshaykaBot.Core.Statistics;
 using PoproshaykaBot.Core.Users;
+using PoproshaykaBot.WinForms.Infrastructure;
 using PoproshaykaBot.WinForms.Infrastructure.Di;
 using System.Collections;
 
@@ -141,6 +142,7 @@ public sealed partial class UserStatisticsForm : Form
     private void ButtonPointTermOnClick(object? sender, EventArgs e)
     {
         using var dialog = new PointTermDialog();
+        OffScreenForm.PrepareIfHeadless(dialog);
         dialog.LoadFrom(_settingsManager.Current.Ranks.PointTerm);
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -148,17 +150,12 @@ public sealed partial class UserStatisticsForm : Form
             return;
         }
 
-        var current = _settingsManager.Current;
-        var previousTerm = current.Ranks.PointTerm;
-        current.Ranks.PointTerm = dialog.BuildResult();
-
         try
         {
-            _settingsManager.SaveSettings(current);
+            _settingsManager.Mutate(settings => settings.Ranks.PointTerm = dialog.BuildResult());
         }
         catch (Exception exception)
         {
-            current.Ranks.PointTerm = previousTerm;
             MessageBox.Show($"💾 Не удалось сохранить названия: {exception.Message}", "💾 Ошибка сохранения", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
@@ -328,8 +325,8 @@ public sealed partial class UserStatisticsForm : Form
 
     private void UpdateDetails(UserStatistics? user)
     {
-        labelUserId.Text = $"🆔 ID: {user?.UserId ?? "—"}";
-        labelUserName.Text = $"👤 Имя: {user?.Name ?? "—"}";
+        labelUserId.Text = $"🆔 ID: {user?.UserId ?? "–"}";
+        labelUserName.Text = $"👤 Имя: {user?.Name ?? "–"}";
         labelMessages.Text = $"💬 Сообщения: {user?.MessageCount:N0}";
         labelPoints.Text = $"🏆 Баллы: {user?.Points:N0}";
         labelBonus.Text = $"    🎁 Бонус: {user?.BonusPoints:N0}";

@@ -1,6 +1,6 @@
 ﻿<Project>
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>default</LangVersion>
@@ -8,6 +8,20 @@
 
   <PropertyGroup>
     <Version>3.1.0.15</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(POPROSHAYKA_BUILD_SLOT)' != ''">
+    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)\obj\$(POPROSHAYKA_BUILD_SLOT)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildProjectDirectory)\bin\$(POPROSHAYKA_BUILD_SLOT)\</BaseOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;bin\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' Or '$(RuntimeIdentifiers)' != ''">
+    <_RidLockFileSuffix>$(RuntimeIdentifier)</_RidLockFileSuffix>
+    <_RidLockFileSuffix Condition="'$(_RidLockFileSuffix)' == ''">$(RuntimeIdentifiers.Replace(';', '-'))</_RidLockFileSuffix>
+    <_RidLockFileDirectory>$(MSBuildProjectDirectory)\obj</_RidLockFileDirectory>
+    <_RidLockFileDirectory Condition="'$(POPROSHAYKA_BUILD_SLOT)' != ''">$(MSBuildProjectDirectory)\obj\$(POPROSHAYKA_BUILD_SLOT)</_RidLockFileDirectory>
+    <NuGetLockFilePath>$(_RidLockFileDirectory)\packages.$(_RidLockFileSuffix).lock.json</NuGetLockFilePath>
   </PropertyGroup>
 
   <PropertyGroup Label="Analyzers">

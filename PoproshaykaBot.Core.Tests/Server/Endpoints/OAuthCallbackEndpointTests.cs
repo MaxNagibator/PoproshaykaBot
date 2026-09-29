@@ -89,7 +89,7 @@ public sealed class OAuthCallbackEndpointTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(body, Does.Not.Contain("<script>"),
-                "Сырой error из query не должен попадать в HTML — иначе XSS на странице авторизации");
+                "Сырой error из query не должен попадать в HTML – иначе XSS на странице авторизации");
 
             Assert.That(body, Does.Contain("&lt;script&gt;").Or.Contain("&#x3C;script&#x3E;"));
         }

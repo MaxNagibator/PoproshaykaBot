@@ -23,7 +23,7 @@ public sealed class UserRankService(SettingsManager settingsManager)
             return match;
         }
 
-        return ranks.Length > 0 ? ranks[^1] : new("♟", "ПЕШКА", 0, 3);
+        return ranks.Length > 0 ? UserRank.Unranked : new("♟", "ПЕШКА", 0, 3);
     }
 
     public string GetRankDisplay(long messageCount)

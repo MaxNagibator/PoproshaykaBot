@@ -1,15 +1,19 @@
 ﻿using Microsoft.Extensions.Logging;
+using PoproshaykaBot.Core.Dashboard;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Lifecycle;
 using PoproshaykaBot.Core.Polls;
 using PoproshaykaBot.Core.Server;
 using PoproshaykaBot.Core.Settings;
 using PoproshaykaBot.Core.Settings.Obs;
+using PoproshaykaBot.Core.Debugging;
+using PoproshaykaBot.Core.Settings.Debugging;
 using PoproshaykaBot.Core.Settings.Stores;
 using PoproshaykaBot.Core.Settings.Ui;
 using PoproshaykaBot.Core.Settings.Update;
 using PoproshaykaBot.Core.Twitch.Auth;
 using PoproshaykaBot.WinForms.Infrastructure.Di;
+using PoproshaykaBot.WinForms.Tiles;
 using System.Text.Json;
 
 namespace PoproshaykaBot.WinForms.Forms.Settings;
@@ -20,12 +24,14 @@ public partial class SettingsForm : Form
     private readonly AccountsStore _accountsStore;
     private readonly ObsChatStore _obsChatStore;
     private readonly ObsIntegrationStore _obsIntegrationStore;
-    private readonly DashboardLayoutStore _dashboardLayoutStore;
+    private readonly DashboardLayoutCoordinator _dashboardLayoutCoordinator;
     private readonly PollsStore _pollsStore;
     private readonly UpdateStore _updateStore;
+    private readonly DebugChannelStore _debugChannelStore;
     private readonly IEventBus _eventBus;
     private readonly KestrelHttpServer _kestrelHttpServer;
     private readonly ILogger<SettingsForm> _logger;
+    private readonly DebugChannelOverride _debugChannelOverride;
     private readonly List<SettingsDraftSection> _sections;
     private AppSettings _settings;
     private TwitchAccountSettings _botDraft;
@@ -35,7 +41,9 @@ public partial class SettingsForm : Form
     private ObsIntegrationSettings _obsIntegrationDraft;
     private PollsSettings _pollsDraft;
     private UpdateSettings _updateDraft;
+    private DebugChannelSettings _debugChannelDraft;
     private DashboardLayoutSettings? _dashboardDraft;
+    private int _dashboardRevision;
     private bool _initialized;
     private bool _hasChanges;
 
@@ -44,9 +52,11 @@ public partial class SettingsForm : Form
         AccountsStore accountsStore,
         ObsChatStore obsChatStore,
         ObsIntegrationStore obsIntegrationStore,
-        DashboardLayoutStore dashboardLayoutStore,
+        DashboardLayoutCoordinator dashboardLayoutCoordinator,
         PollsStore pollsStore,
         UpdateStore updateStore,
+        DebugChannelStore debugChannelStore,
+        DebugChannelOverride debugChannelOverride,
         IEventBus eventBus,
         KestrelHttpServer kestrelHttpServer,
         ILogger<SettingsForm> logger)
@@ -55,9 +65,11 @@ public partial class SettingsForm : Form
         _accountsStore = accountsStore;
         _obsChatStore = obsChatStore;
         _obsIntegrationStore = obsIntegrationStore;
-        _dashboardLayoutStore = dashboardLayoutStore;
+        _dashboardLayoutCoordinator = dashboardLayoutCoordinator;
         _pollsStore = pollsStore;
         _updateStore = updateStore;
+        _debugChannelStore = debugChannelStore;
+        _debugChannelOverride = debugChannelOverride;
         _eventBus = eventBus;
         _kestrelHttpServer = kestrelHttpServer;
         _logger = logger;
@@ -70,7 +82,11 @@ public partial class SettingsForm : Form
         _obsIntegrationDraft = JsonStoreClone.DeepClone(obsIntegrationStore.Load());
         _pollsDraft = JsonStoreClone.DeepClone(pollsStore.Load());
         _updateDraft = JsonStoreClone.DeepClone(updateStore.Load());
-        _dashboardDraft = JsonStoreClone.DeepCloneNullable(dashboardLayoutStore.LoadDashboard());
+        _debugChannelDraft = JsonStoreClone.DeepClone(debugChannelStore.Load());
+        var dashboardSnapshot = dashboardLayoutCoordinator.Read();
+
+        _dashboardRevision = dashboardSnapshot.Revision;
+        _dashboardDraft = dashboardSnapshot.Layout;
 
         InitializeComponent();
 
@@ -103,6 +119,8 @@ public partial class SettingsForm : Form
                 () => _pollsSettingsControl.SaveSettings(_pollsDraft)),
             new(() => _updateSettingsControl.LoadSettings(_updateDraft),
                 () => _updateSettingsControl.SaveSettings(_updateDraft)),
+            new(() => _debugChannelSettingsControl.LoadSettings(_debugChannelDraft, _debugChannelOverride),
+                () => _debugChannelSettingsControl.SaveSettings(_debugChannelDraft)),
             new(() => _dashboardSettingsControl.LoadSettings(_dashboardDraft),
                 () => _dashboardDraft = _dashboardSettingsControl.SaveSettings()),
         ];
@@ -214,7 +232,11 @@ public partial class SettingsForm : Form
         _obsIntegrationDraft = new();
         _pollsDraft = new();
         _updateDraft = new();
-        _dashboardDraft = null;
+        _debugChannelDraft = new();
+        var dashboardSnapshot = _dashboardLayoutCoordinator.Read();
+
+        _dashboardRevision = dashboardSnapshot.Revision;
+        _dashboardDraft = DashboardLayoutReconciler.ResetToDefaults(DashboardLayoutDefaults.Create(), dashboardSnapshot.Layout);
 
         LoadSettingsToControls();
         _hasChanges = true;
@@ -264,8 +286,8 @@ public partial class SettingsForm : Form
 
                 Перезаписать их значениями из этого окна?
 
-                «Да» — применить значения из этого окна.
-                «Нет» — оставить внешние изменения, не трогая вкладку «OBS Чат».
+                «Да» – применить значения из этого окна.
+                «Нет» – оставить внешние изменения, не трогая вкладку «OBS Чат».
                 """,
                 "Конфликт настроек чат-оверлея",
                 MessageBoxButtons.YesNo,
@@ -312,10 +334,11 @@ public partial class SettingsForm : Form
             _obsIntegrationStore.Save(_obsIntegrationDraft);
             _pollsStore.Save(_pollsDraft);
             _updateStore.Save(_updateDraft);
+            _debugChannelStore.Save(_debugChannelDraft);
 
             if (_dashboardDraft != null)
             {
-                _dashboardLayoutStore.SaveDashboard(_dashboardDraft);
+                _dashboardRevision = _dashboardLayoutCoordinator.Commit(_dashboardDraft, _dashboardRevision).Snapshot.Revision;
             }
 
             if (!string.Equals(prevBotToken, _botDraft.AccessToken, StringComparison.Ordinal))
@@ -367,7 +390,7 @@ public partial class SettingsForm : Form
     {
         if (!RedirectUriPortResolver.TryResolve(_settings.Twitch.RedirectUri, out var derivedPort))
         {
-            _logger.LogWarning("Некорректный RedirectUri '{RedirectUri}' — порт HTTP сервера не обновлён",
+            _logger.LogWarning("Некорректный RedirectUri '{RedirectUri}' – порт HTTP сервера не обновлён",
                 _settings.Twitch.RedirectUri);
 
             return;

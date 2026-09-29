@@ -54,8 +54,18 @@ public sealed class ObsWebSocketClient(ILogger<ObsWebSocketClient> logger) : IOb
     private ClientWebSocket? _socket;
     private CancellationTokenSource? _receiveCts;
     private Task? _receiveTask;
+    private long _lastExchangeAtUtcTicks;
 
     public event EventHandler<ObsWebSocketEventArgs>? EventReceived;
+
+    public DateTimeOffset? LastExchangeAt
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref _lastExchangeAtUtcTicks);
+            return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+    }
 
     public bool IsConnected
     {
@@ -404,6 +414,8 @@ public sealed class ObsWebSocketClient(ILogger<ObsWebSocketClient> logger) : IOb
         {
             return;
         }
+
+        Interlocked.Exchange(ref _lastExchangeAtUtcTicks, DateTimeOffset.UtcNow.UtcTicks);
 
         var status = data.GetProperty("requestStatus");
         var response = new ObsRequestResponse(status.GetProperty("result").GetBoolean(),

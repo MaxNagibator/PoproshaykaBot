@@ -19,7 +19,7 @@ public class BroadcastProfilesPanelTests
         var forms = Substitute.For<IFormFactory>();
         var bus = Substitute.For<IEventBus>();
         var streamStatus = Substitute.For<IStreamStatus>();
-        var profilesStore = Substitute.For<BroadcastProfilesStore>(NullLogger<BroadcastProfilesStore>.Instance, null);
+        var profilesStore = Substitute.For<BroadcastProfilesStore>(NullLogger<BroadcastProfilesStore>.Instance, null, null);
         profilesStore.Load().Returns(new BroadcastProfilesSettings());
 
         using var panel = new BroadcastProfilesPanel

@@ -17,7 +17,7 @@ public sealed class StreamInfoCommand(IStreamStatus streamStatusManager) : IChat
     {
         var info = streamStatusManager.CurrentStream;
 
-        if (info == null)
+        if (info == null || info.IsBare)
         {
             var text = streamStatusManager.CurrentStatus == StreamStatus.Online
                 ? "Стрим онлайн, детали загружаются"

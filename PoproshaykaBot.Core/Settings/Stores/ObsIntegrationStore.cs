@@ -2,77 +2,37 @@
 using PoproshaykaBot.Core.Infrastructure;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Settings;
-using PoproshaykaBot.Core.Infrastructure.Persistence;
 using PoproshaykaBot.Core.Settings.Obs;
-using System.Text.Json;
 
 namespace PoproshaykaBot.Core.Settings.Stores;
 
 public sealed class ObsIntegrationStore
 {
     private readonly IEventBus _eventBus;
-    private readonly ILogger<ObsIntegrationStore>? _logger;
-    private readonly string _filePath;
-    private readonly object _syncLock = new();
+    private readonly JsonStore<ObsIntegrationSettings> _store;
 
-    private ObsIntegrationSettings _state;
-
-    public ObsIntegrationStore(IEventBus eventBus, ILogger<ObsIntegrationStore>? logger = null, string? filePath = null)
+    public ObsIntegrationStore(IEventBus eventBus, ILogger<ObsIntegrationStore>? logger = null, string? filePath = null, SettingsWriteGate? gate = null)
     {
-        _eventBus = eventBus;
-        _logger = logger;
-        _filePath = filePath ?? AppPaths.SettingsFile("obs-integration.json");
-        _state = ReadFile();
+        ArgumentNullException.ThrowIfNull(eventBus);
 
-        _logger?.LogDebug("ObsIntegrationStore инициализирован из {FilePath}", _filePath);
+        var path = filePath ?? AppPaths.SettingsFile("obs-integration.json");
+
+        _eventBus = eventBus;
+        _store = new(path, logger, describe: SettingsDescriber.Describe, gate: gate);
+
+        logger?.LogDebug("ObsIntegrationStore инициализирован из {FilePath}", path);
     }
 
     public ObsIntegrationSettings Load()
     {
-        lock (_syncLock)
-        {
-            return JsonStoreClone.DeepClone(_state);
-        }
+        return _store.Load();
     }
 
     public void Save(ObsIntegrationSettings value)
     {
-        ArgumentNullException.ThrowIfNull(value);
+        var committed = JsonStoreClone.DeepClone(value);
+        _store.Save(committed);
 
-        ObsIntegrationSettings broadcastCopy;
-
-        lock (_syncLock)
-        {
-            _state = JsonStoreClone.DeepClone(value);
-            var json = JsonSerializer.Serialize(_state, JsonStoreOptions.Default);
-            AtomicFile.Save(_filePath, json, _logger);
-
-            broadcastCopy = JsonStoreClone.DeepClone(_state);
-
-            _logger?.LogInformation("ObsIntegrationStore: настройки OBS-интеграции сохранены в {FilePath}", _filePath);
-        }
-
-        _ = _eventBus.PublishAsync(new ObsIntegrationSettingsChangedEvent(broadcastCopy));
-    }
-
-    private ObsIntegrationSettings ReadFile()
-    {
-        if (!File.Exists(_filePath))
-        {
-            _logger?.LogDebug("ObsIntegrationStore: файл {FilePath} не найден, используются дефолты", _filePath);
-            return new();
-        }
-
-        try
-        {
-            var json = File.ReadAllText(_filePath);
-            return JsonSerializer.Deserialize<ObsIntegrationSettings>(json, JsonStoreOptions.Default) ?? new();
-        }
-        catch (Exception exception)
-        {
-            _logger?.LogError(exception, "Ошибка чтения {FilePath}, применяются дефолты", _filePath);
-            JsonStoreBackup.CreateBackup(_filePath, "invalid", _logger);
-            return new();
-        }
+        _ = _eventBus.PublishAsync(new ObsIntegrationSettingsChangedEvent(committed));
     }
 }

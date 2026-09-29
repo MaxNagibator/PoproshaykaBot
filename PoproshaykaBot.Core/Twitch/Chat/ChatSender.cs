@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PoproshaykaBot.Core.Chat;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Infrastructure.Hosting;
 using PoproshaykaBot.Core.Twitch.Helix;
 using System.Net;
@@ -12,11 +14,14 @@ public sealed class ChatSender(
     ITwitchHelixClient helix,
     IBroadcasterIdProvider broadcasterIdProvider,
     IBotUserIdProvider botUserIdProvider,
+    ITargetChannelProvider targetChannelProvider,
+    CommandResponseTracker commandResponseTracker,
     ILogger<ChatSender> logger)
     : IHostedComponent
 {
     private const int MaxMessageLength = 500;
     private const int MaxSendAttempts = 5;
+    private const int QueueCapacity = 1000;
     private const double RateLimitMaxDelaySeconds = 30.0;
     private static readonly TimeSpan SendInterval = TimeSpan.FromMilliseconds(750);
     private static readonly TimeSpan MaxDrainTimeout = TimeSpan.FromSeconds(120);
@@ -27,6 +32,10 @@ public sealed class ChatSender(
     private Task? _backgroundTask;
     private CancellationTokenSource? _cts;
 
+    private long _sentCount;
+    private long _failedCount;
+    private long _lastSentAtUtcTicks;
+
     private enum SendOutcome
     {
         Done = 0,
@@ -36,6 +45,23 @@ public sealed class ChatSender(
     public string Name => "Отправитель сообщений чата (Helix)";
 
     public int StartOrder => 50;
+
+    public int QueueLength => _channel.Reader.CanCount ? _channel.Reader.Count : 0;
+
+    public int QueueMaxLength => QueueCapacity;
+
+    public long SentCount => Interlocked.Read(ref _sentCount);
+
+    public long FailedCount => Interlocked.Read(ref _failedCount);
+
+    public DateTimeOffset? LastSentAt
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref _lastSentAtUtcTicks);
+            return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+    }
 
     public Task StartAsync(IProgress<string> progress, CancellationToken cancellationToken)
     {
@@ -76,7 +102,7 @@ public sealed class ChatSender(
         {
             var remaining = _channel.Reader.CanCount ? _channel.Reader.Count : -1;
             logger.LogWarning(timeoutEx,
-                "ChatSender: дренаж очереди прерван (в очереди осталось {Remaining}) — не все сообщения отправлены, принудительная остановка",
+                "ChatSender: дренаж очереди прерван (в очереди осталось {Remaining}) – не все сообщения отправлены, принудительная остановка",
                 remaining);
 
             if (_cts != null)
@@ -104,13 +130,57 @@ public sealed class ChatSender(
         }
     }
 
-    public async Task EnqueueAsync(
+    public Task EnqueueAsync(
         string message,
         string? replyParentMessageId,
+        CommandResponseMark? commandResponse,
         CancellationToken cancellationToken)
+    {
+        Enqueue(message, replyParentMessageId, commandResponse, null);
+        return Task.CompletedTask;
+    }
+
+    public Task EnqueueWhisperAsync(
+        string message,
+        string toUserId,
+        string fallbackReplyParentMessageId,
+        CommandResponseMark? commandResponse,
+        CancellationToken cancellationToken)
+    {
+        WhisperRoute? whisper = null;
+
+        if (string.IsNullOrWhiteSpace(toUserId))
+        {
+            logger.LogWarning("ChatSender: шёпот не отправлен – неизвестен id вызвавшего, ответ уходит реплаем на его сообщение");
+        }
+        else
+        {
+            whisper = new(toUserId);
+        }
+
+        Enqueue(message, fallbackReplyParentMessageId, commandResponse, whisper);
+        return Task.CompletedTask;
+    }
+
+    private void Enqueue(
+        string message,
+        string? replyParentMessageId,
+        CommandResponseMark? commandResponse,
+        WhisperRoute? whisper)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
+            return;
+        }
+
+        var target = targetChannelProvider.Current;
+
+        if (!target.IsSendingAllowed)
+        {
+            logger.LogInformation("Режим наблюдателя ({Channel}): сообщение не отправлено – {Message}",
+                target.Login,
+                message);
+
             return;
         }
 
@@ -118,12 +188,14 @@ public sealed class ChatSender(
 
         foreach (var chunk in SplitByLength(message, MaxMessageLength))
         {
-            var item = new ChatSendItem(chunk, replyParentMessageId);
+            var item = new ChatSendItem(chunk, replyParentMessageId, target.Login, commandResponse, whisper);
 
             if (channel.Writer.TryWrite(item))
             {
                 continue;
             }
+
+            Interlocked.Increment(ref _failedCount);
 
             if (channel.Reader.Completion.IsCompleted)
             {
@@ -138,7 +210,7 @@ public sealed class ChatSender(
 
     private static Channel<ChatSendItem> CreateChannel()
     {
-        return Channel.CreateBounded<ChatSendItem>(new BoundedChannelOptions(1000)
+        return Channel.CreateBounded<ChatSendItem>(new BoundedChannelOptions(QueueCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
@@ -253,6 +325,7 @@ public sealed class ChatSender(
 
             if (string.IsNullOrEmpty(broadcasterId))
             {
+                Interlocked.Increment(ref _failedCount);
                 logger.LogWarning("ChatSender: broadcaster id не получен, сообщение пропущено");
                 return SendOutcome.Done;
             }
@@ -261,15 +334,46 @@ public sealed class ChatSender(
 
             if (string.IsNullOrEmpty(senderId))
             {
+                Interlocked.Increment(ref _failedCount);
                 logger.LogWarning("ChatSender: sender id не получен, сообщение пропущено");
                 return SendOutcome.Done;
             }
 
-            await helix.SendChatMessageAsync(broadcasterId, senderId, item.Message, item.ReplyParentMessageId, ct);
+            if (item.Whisper is { Refused: false } whisper
+                && await TryWhisperAsync(item.Message, whisper, senderId, ct))
+            {
+                return SendOutcome.Done;
+            }
+
+            var messageId = await helix.SendChatMessageAsync(broadcasterId, senderId, item.Message, item.ReplyParentMessageId, ct);
+
+            Interlocked.Increment(ref _sentCount);
+            Interlocked.Exchange(ref _lastSentAtUtcTicks, DateTimeOffset.UtcNow.UtcTicks);
+
+            if (item.CommandResponse is { } commandResponse && !string.IsNullOrEmpty(messageId))
+            {
+                commandResponseTracker.Expect(messageId, commandResponse);
+            }
+
+            if (string.IsNullOrEmpty(item.ReplyParentMessageId))
+            {
+                logger.LogInformation("ChatSender: сообщение отправлено в канал {Channel} – {Message}",
+                    item.TargetLogin,
+                    item.Message);
+            }
+            else
+            {
+                logger.LogInformation("ChatSender: ответ отправлен в канал {Channel} на сообщение {ReplyParentMessageId} – {Message}",
+                    item.TargetLogin,
+                    item.ReplyParentMessageId,
+                    item.Message);
+            }
+
             return SendOutcome.Done;
         }
         catch (HelixMessageDroppedException ex)
         {
+            Interlocked.Increment(ref _failedCount);
             logger.LogWarning(ex, "Сообщение отклонено Twitch: {Code} {Reason}", ex.ReasonCode, ex.ReasonMessage);
             return SendOutcome.Done;
         }
@@ -279,6 +383,7 @@ public sealed class ChatSender(
         }
         catch (HelixRequestException ex)
         {
+            Interlocked.Increment(ref _failedCount);
             logger.LogError(ex, "ChatSender: ошибка Helix {Status} при отправке сообщения", (int)ex.StatusCode);
             return SendOutcome.Done;
         }
@@ -288,16 +393,65 @@ public sealed class ChatSender(
         }
         catch (Exception ex)
         {
+            Interlocked.Increment(ref _failedCount);
             logger.LogError(ex, "ChatSender: неожиданная ошибка при отправке сообщения");
             return SendOutcome.Done;
         }
+    }
+
+    private async Task<bool> TryWhisperAsync(string message, WhisperRoute whisper, string senderId, CancellationToken ct)
+    {
+        if (string.Equals(senderId, whisper.ToUserId, StringComparison.Ordinal))
+        {
+            whisper.Refused = true;
+            logger.LogWarning("ChatSender: шёпот не отправлен – команду вызвал сам аккаунт бота, ответ уходит реплаем на его сообщение");
+            return false;
+        }
+
+        try
+        {
+            await helix.SendWhisperAsync(senderId, whisper.ToUserId, message, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HelixRequestException ex)
+        {
+            whisper.Refused = true;
+            logger.LogWarning("ChatSender: Twitch не принял шёпот пользователю {UserId} ({Status}: {Reason}) – ответ уходит реплаем на его сообщение",
+                whisper.ToUserId,
+                (int)ex.StatusCode,
+                ex.TwitchErrorMessage ?? "причина не названа");
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            whisper.Refused = true;
+            logger.LogWarning("ChatSender: шёпот пользователю {UserId} не отправлен ({Error}) – ответ уходит реплаем на его сообщение",
+                whisper.ToUserId,
+                ex.Message);
+
+            return false;
+        }
+
+        Interlocked.Increment(ref _sentCount);
+        Interlocked.Exchange(ref _lastSentAtUtcTicks, DateTimeOffset.UtcNow.UtcTicks);
+
+        logger.LogInformation("ChatSender: ответ отправлен шёпотом пользователю {UserId} ({Length} симв.)",
+            whisper.ToUserId,
+            message.Length);
+
+        return true;
     }
 
     private async Task<bool> WaitForRateLimitAsync(int attempt, TimeSpan delay, CancellationToken ct)
     {
         if (attempt >= MaxSendAttempts)
         {
-            logger.LogError("ChatSender: rate limit 429, исчерпаны все {MaxAttempts} попыток — сообщение отброшено", MaxSendAttempts);
+            Interlocked.Increment(ref _failedCount);
+            logger.LogError("ChatSender: rate limit 429, исчерпаны все {MaxAttempts} попыток – сообщение отброшено", MaxSendAttempts);
             return false;
         }
 
@@ -315,5 +469,17 @@ public sealed class ChatSender(
         }
     }
 
-    private sealed record ChatSendItem(string Message, string? ReplyParentMessageId);
+    private sealed record ChatSendItem(
+        string Message,
+        string? ReplyParentMessageId,
+        string TargetLogin,
+        CommandResponseMark? CommandResponse,
+        WhisperRoute? Whisper);
+
+    private sealed class WhisperRoute(string toUserId)
+    {
+        public string ToUserId { get; } = toUserId;
+
+        public bool Refused { get; set; }
+    }
 }

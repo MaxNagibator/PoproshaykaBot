@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -34,6 +35,45 @@ internal sealed class EndpointTestServer : IDisposable
                         {
                             var mapper = mapperFactory(app.ApplicationServices);
                             mapper.Map(endpoints);
+                        });
+                    });
+            });
+
+        var host = await builder.StartAsync();
+        return new(host);
+    }
+
+    public const string MatchedEndpointHeader = "X-Matched-Endpoint";
+
+    public static async Task<EndpointTestServer> CreateAllAsync(Action<IServiceCollection> configureServices)
+    {
+        var builder = new HostBuilder()
+            .ConfigureWebHost(webHost =>
+            {
+                webHost.UseTestServer()
+                    .ConfigureServices(configureServices)
+                    .Configure(app =>
+                    {
+                        app.UseRouting();
+
+                        app.Use(async (ctx, next) =>
+                        {
+                            var matched = ctx.GetEndpoint();
+
+                            if (matched != null)
+                            {
+                                ctx.Response.Headers[MatchedEndpointHeader] = matched.DisplayName;
+                            }
+
+                            await next(ctx);
+                        });
+
+                        app.UseEndpoints(endpoints =>
+                        {
+                            foreach (var mapper in app.ApplicationServices.GetRequiredService<IEnumerable<IEndpointMapper>>())
+                            {
+                                mapper.Map(endpoints);
+                            }
                         });
                     });
             });

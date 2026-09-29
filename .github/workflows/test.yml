@@ -21,7 +21,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
           cache: true
           cache-dependency-path: "**/packages.lock.json"
 
@@ -48,6 +48,11 @@ jobs:
   ui-tests:
     runs-on: windows-2022
 
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ Wpf ]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,35 +62,58 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
           cache: true
           cache-dependency-path: "**/packages.lock.json"
 
       - name: Build app (Release, x64)
+        id: build-app
         run: >
-          dotnet build PoproshaykaBot.WinForms/PoproshaykaBot.WinForms.csproj
+          dotnet build PoproshaykaBot.${{ matrix.host }}/PoproshaykaBot.${{ matrix.host }}.csproj
           --configuration Release
           -p:PublishSingleFile=false
           -p:PublishReadyToRun=false
 
       - name: Build UI tests
         run: >
-          dotnet build PoproshaykaBot.WinForms.Tests/PoproshaykaBot.WinForms.Tests.csproj
+          dotnet build PoproshaykaBot.${{ matrix.host }}.Tests/PoproshaykaBot.${{ matrix.host }}.Tests.csproj
           --configuration Release
 
       - name: Run UI tests
         run: >
-          dotnet test PoproshaykaBot.WinForms.Tests/PoproshaykaBot.WinForms.Tests.csproj
+          dotnet test PoproshaykaBot.${{ matrix.host }}.Tests/PoproshaykaBot.${{ matrix.host }}.Tests.csproj
           --configuration Release
           --no-build
-          --logger "trx;LogFileName=ui-tests.trx"
+          --logger "trx;LogFileName=ui-tests-${{ matrix.host }}.trx"
           --results-directory TestResults
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-test-results
+          name: ui-test-results-${{ matrix.host }}
           path: TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload ui-smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-smoke-diagnostics-${{ matrix.host }}
+          path: artifacts/ui-smoke/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Capture gallery
+        if: always() && matrix.host == 'Wpf' && steps.build-app.outcome == 'success'
+        run: pwsh -NoProfile -File tools/capture-view.ps1 -Configuration Release -NoBuild
+
+      - name: Upload gallery frames
+        if: always() && matrix.host == 'Wpf'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-gallery-${{ matrix.host }}
+          path: artifacts/gallery/**
           if-no-files-found: warn
           retention-days: 7

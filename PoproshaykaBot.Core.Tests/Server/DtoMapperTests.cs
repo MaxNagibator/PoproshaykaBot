@@ -19,7 +19,7 @@ public sealed class DtoMapperTests
             MessageId = "twitch-message-id-42",
         };
 
-        var dto = DtoMapper.ToServerMessage(data);
+        var dto = DtoMapper.ToServerMessage(data, new());
         var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -47,7 +47,7 @@ public sealed class DtoMapperTests
             IsFirstTime = true,
         };
 
-        var dto = DtoMapper.ToServerMessage(data);
+        var dto = DtoMapper.ToServerMessage(data, new());
         var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -75,7 +75,7 @@ public sealed class DtoMapperTests
             Color = "#FF7F50",
         };
 
-        var dto = DtoMapper.ToServerMessage(data);
+        var dto = DtoMapper.ToServerMessage(data, new());
         var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

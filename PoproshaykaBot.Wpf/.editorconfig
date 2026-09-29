@@ -1,0 +1,4 @@
+﻿[*.cs]
+
+# WPF code-behind event handlers (Closing/Loaded/...) are inherently async void
+dotnet_diagnostic.VSTHRD100.severity = silent

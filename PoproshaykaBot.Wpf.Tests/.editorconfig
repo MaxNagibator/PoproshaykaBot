@@ -1,0 +1,11 @@
+[*.cs]
+
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.VSTHRD200.severity = none
+dotnet_diagnostic.IDISP001.severity = silent
+dotnet_diagnostic.IDISP003.severity = silent
+dotnet_diagnostic.IDISP004.severity = silent
+dotnet_diagnostic.IDISP017.severity = silent
+dotnet_diagnostic.S108.severity = silent
+dotnet_diagnostic.CA1861.severity = silent
+dotnet_diagnostic.MA0002.severity = silent

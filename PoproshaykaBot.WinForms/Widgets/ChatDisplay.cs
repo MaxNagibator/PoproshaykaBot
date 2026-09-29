@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Core;
+using PoproshaykaBot.Core.Chat.Display;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Infrastructure;
 using PoproshaykaBot.Core.Settings;
 using PoproshaykaBot.Core.Twitch.Auth;
@@ -7,74 +9,12 @@ using PoproshaykaBot.WinForms.Infrastructure;
 using PoproshaykaBot.WinForms.Infrastructure.Di;
 using PoproshaykaBot.WinForms.Tiles;
 using System.Diagnostics;
-using System.Globalization;
-using System.Text.Json;
 
 namespace PoproshaykaBot.WinForms.Widgets;
 
 public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvider
 {
     private const string WebView2RuntimeDownloadUrl = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
-    private const double DefaultZoom = 0.75;
-
-    private const string HideClutterScriptTemplate = """
-                                                     (function () {
-                                                         const selectors = __SELECTORS__;
-                                                         const wrapperClasses = ['tw-transition', 'tw-callout', 'consent-banner'];
-                                                         const findWrapper = (el) => {
-                                                             let node = el;
-                                                             for (let i = 0; i < 15 && node; i++) {
-                                                                 if (node.classList && wrapperClasses.some((c) => node.classList.contains(c))) {
-                                                                     return node;
-                                                                 }
-                                                                 node = node.parentElement;
-                                                             }
-                                                             return el;
-                                                         };
-                                                         const hideAll = () => {
-                                                             const consentAccept = document.querySelector('[data-a-target="consent-banner-accept"]');
-                                                             if (consentAccept) {
-                                                                 consentAccept.click();
-                                                             }
-                                                             for (const selector of selectors) {
-                                                                 document.querySelectorAll(selector).forEach((el) => {
-                                                                     const wrapper = findWrapper(el);
-                                                                     if (wrapper.dataset.poproshaykaHidden !== '1') {
-                                                                         wrapper.dataset.poproshaykaHidden = '1';
-                                                                         wrapper.style.setProperty('display', 'none', 'important');
-                                                                     }
-                                                                 });
-                                                             }
-                                                         };
-                                                         hideAll();
-                                                         if (document.readyState === 'loading') {
-                                                             document.addEventListener('DOMContentLoaded', hideAll, { once: true });
-                                                         }
-                                                         const startObserver = () => {
-                                                             if (document.documentElement) {
-                                                                 new MutationObserver(hideAll).observe(document.documentElement, { childList: true, subtree: true });
-                                                             } else {
-                                                                 setTimeout(startObserver, 0);
-                                                             }
-                                                         };
-                                                         startObserver();
-                                                     })();
-                                                     """;
-
-    private static readonly string[] BuiltInClutterSelectors =
-    [
-        "[data-a-target=\"consent-banner\"]",
-        ".consent-banner",
-        ".tw-callout-message",
-        "[class*=\"channelLeaderboardHeader\"]",
-        "[class*=\"channelLeaderboardBottomIconContainer\"]",
-        "[class*=\"community-highlight\"]",
-    ];
-
-    private static readonly string BlockersFilePath = AppPaths.Combine("chat-blockers.txt");
-
-    private static readonly string ZoomFilePath = AppPaths.Combine("chat-zoom.txt");
-
     private bool _initialized;
     private bool _reloadAttempted;
     private ToolStripButton? _reloadButton;
@@ -93,7 +33,13 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
     public SettingsManager Settings { get; internal init; } = null!;
 
     [Inject]
+    public ITargetChannelProvider TargetChannel { get; internal init; } = null!;
+
+    [Inject]
     public ILogger<ChatDisplay> Logger { get; internal init; } = null!;
+
+    [Inject]
+    public ChatDisplayStore Store { get; internal init; } = null!;
 
     public IReadOnlyList<ToolStripItem> CreateHeaderItems()
     {
@@ -132,7 +78,7 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
             AutoToolTip = false,
             DisplayStyle = ToolStripItemDisplayStyle.Text,
             Text = "🗑",
-            ToolTipText = "Очистить куки и кэш активного аккаунта (бот или стример — настраивается в первичной настройке)",
+            ToolTipText = "Очистить куки и кэш активного аккаунта (бот или стример – настраивается в первичной настройке)",
         };
 
         _resetSessionButton.Click += OnResetSessionClicked;
@@ -216,15 +162,7 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
     {
         var zoom = _webView.ZoomFactor;
 
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(ZoomFilePath)!);
-            File.WriteAllText(ZoomFilePath, zoom.ToString("F3", CultureInfo.InvariantCulture));
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Не удалось сохранить масштаб чата");
-        }
+        Store.SaveZoom(zoom);
     }
 
     private void OnReloadClicked(object? sender, EventArgs e)
@@ -239,7 +177,7 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
 
     private void OnResetZoomClicked(object? sender, EventArgs e)
     {
-        _webView.ZoomFactor = DefaultZoom;
+        _webView.ZoomFactor = ChatDisplayStore.DefaultZoom;
     }
 
     private void OnOpenInBrowserClicked(object? sender, EventArgs e)
@@ -248,7 +186,7 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
 
         if (string.IsNullOrEmpty(url))
         {
-            var channel = Settings.Current.Twitch.Channel?.Trim();
+            var channel = TargetChannel.Current.Login.Trim();
 
             if (string.IsNullOrEmpty(channel))
             {
@@ -320,19 +258,13 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
 
     private async void OnEditBlockersClicked(object? sender, EventArgs e)
     {
-        if (!TryEditBlockers(LoadUserSelectorsText(), out var updated))
+        if (!TryEditBlockers(Store.LoadBlockersText(), out var updated))
         {
             return;
         }
 
-        try
+        if (!Store.TrySaveBlockersText(updated))
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(BlockersFilePath)!);
-            File.WriteAllText(BlockersFilePath, updated);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Не удалось сохранить список блокираторов баннеров чата");
             MessageBox.Show(this, "Не удалось сохранить список блокираторов. Подробности – в логах.",
                 "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
@@ -363,7 +295,7 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
 
             await RegisterClutterScriptAsync();
 
-            _webView.ZoomFactor = LoadSavedZoom();
+            _webView.ZoomFactor = Store.LoadZoom();
 
             NavigateToChannel();
         }
@@ -386,7 +318,7 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
             return;
         }
 
-        var channel = Settings.Current.Twitch.Channel?.Trim();
+        var channel = TargetChannel.Current.Login.Trim();
 
         if (string.IsNullOrEmpty(channel))
         {
@@ -419,7 +351,7 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
         _webView.Visible = false;
         SetHeaderItemsEnabled(false);
         _fallbackPanel.Visible = true;
-        _fallbackLabel.Text = "Не удалось открыть чат Twitch. Подробности — в логах.";
+        _fallbackLabel.Text = "Не удалось открыть чат Twitch. Подробности – в логах.";
         _fallbackLink.Visible = false;
     }
 
@@ -430,31 +362,6 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
         _openInBrowserButton?.Enabled = enabled;
         _resetSessionButton?.Enabled = enabled;
         _editBlockersButton?.Enabled = enabled;
-    }
-
-    private double LoadSavedZoom()
-    {
-        try
-        {
-            if (!File.Exists(ZoomFilePath))
-            {
-                return DefaultZoom;
-            }
-
-            var text = File.ReadAllText(ZoomFilePath).Trim();
-
-            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var zoom)
-                && zoom is >= 0.25 and <= 5.0)
-            {
-                return zoom;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Не удалось прочитать сохранённый масштаб чата");
-        }
-
-        return DefaultZoom;
     }
 
     private async Task RegisterClutterScriptAsync()
@@ -473,38 +380,11 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
                 core.RemoveScriptToExecuteOnDocumentCreated(_clutterScriptId);
             }
 
-            _clutterScriptId = await core.AddScriptToExecuteOnDocumentCreatedAsync(BuildHideClutterScript());
+            _clutterScriptId = await core.AddScriptToExecuteOnDocumentCreatedAsync(Store.BuildHideClutterScript());
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Не удалось применить блокираторы баннеров чата");
-        }
-    }
-
-    private string BuildHideClutterScript()
-    {
-        var selectors = BuiltInClutterSelectors.Concat(LoadUserSelectors()).ToArray();
-        return HideClutterScriptTemplate.Replace("__SELECTORS__", JsonSerializer.Serialize(selectors), StringComparison.Ordinal);
-    }
-
-    private IEnumerable<string> LoadUserSelectors()
-    {
-        return LoadUserSelectorsText()
-            .Split('\n')
-            .Select(line => line.Trim())
-            .Where(line => line.Length > 0 && !line.StartsWith('#'));
-    }
-
-    private string LoadUserSelectorsText()
-    {
-        try
-        {
-            return File.Exists(BlockersFilePath) ? File.ReadAllText(BlockersFilePath) : string.Empty;
-        }
-        catch (IOException ex)
-        {
-            Logger.LogWarning(ex, "Не удалось прочитать список блокираторов баннеров чата");
-            return string.Empty;
         }
     }
 
@@ -520,6 +400,8 @@ public sealed partial class ChatDisplay : UserControl, IDashboardTileHeaderProvi
             ClientSize = LogicalToDeviceUnits(new Size(460, 320)),
             MinimumSize = LogicalToDeviceUnits(new Size(360, 240)),
         };
+
+        OffScreenForm.PrepareIfHeadless(dialog);
 
         var layout = new TableLayoutPanel
         {

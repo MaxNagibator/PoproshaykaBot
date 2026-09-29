@@ -65,7 +65,7 @@ jobs:
         arch: [ x64, x86 ]
     defaults:
       run:
-        working-directory: ./PoproshaykaBot.WinForms
+        working-directory: ./PoproshaykaBot.Wpf
 
     steps:
       - name: Checkout
@@ -76,13 +76,13 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
           cache: true
           cache-dependency-path: "**/packages.lock.json"
 
       - name: Publish framework-dependent
         run: >
-          dotnet publish
+          dotnet publish PoproshaykaBot.Wpf.csproj
           --configuration Release
           --runtime win-${{ matrix.arch }}
           --output .\publish\framework-dependent
@@ -94,7 +94,7 @@ jobs:
 
       - name: Publish portable
         run: >
-          dotnet publish
+          dotnet publish PoproshaykaBot.Wpf.csproj
           --configuration Release
           --runtime win-${{ matrix.arch }}
           --output .\publish\portable
@@ -112,8 +112,8 @@ jobs:
           $version = "${{ needs.prepare.outputs.version }}"
           $arch = "${{ matrix.arch }}"
           New-Item -ItemType Directory -Path ".\artifacts" -Force | Out-Null
-          Rename-Item -Path ".\publish\framework-dependent\PoproshaykaBot.WinForms.exe" -NewName "PoproshaykaBot-v$version-$arch.exe"
-          Rename-Item -Path ".\publish\portable\PoproshaykaBot.WinForms.exe" -NewName "PoproshaykaBot-v$version-$arch-portable.exe"
+          Rename-Item -Path ".\publish\framework-dependent\PoproshaykaBot.Wpf.exe" -NewName "PoproshaykaBot-v$version-$arch.exe"
+          Rename-Item -Path ".\publish\portable\PoproshaykaBot.Wpf.exe" -NewName "PoproshaykaBot-v$version-$arch-portable.exe"
           Move-Item -Path ".\publish\framework-dependent\PoproshaykaBot-v$version-$arch.exe" -Destination ".\artifacts\"
           Move-Item -Path ".\publish\portable\PoproshaykaBot-v$version-$arch-portable.exe" -Destination ".\artifacts\"
           Compress-Archive -Path ".\artifacts\PoproshaykaBot-v$version-$arch.exe" -DestinationPath ".\artifacts\PoproshaykaBot-v$version-$arch.zip"
@@ -122,14 +122,14 @@ jobs:
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             "$hash  $($_.Name)"
           } | Set-Content ".\artifacts\SHA256SUMS-$arch.txt" -Encoding ascii
-          $tfm = (Select-String -Path ".\PoproshaykaBot.WinForms.csproj" -Pattern '<TargetFramework>(.*?)</TargetFramework>').Matches[0].Groups[1].Value
+          $tfm = (Select-String -Path ".\PoproshaykaBot.Wpf.csproj" -Pattern '<TargetFramework>(.*?)</TargetFramework>').Matches[0].Groups[1].Value
           Set-Content ".\artifacts\RUNTIME-$arch.txt" -Value $tfm -Encoding ascii -NoNewline
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.arch }}
-          path: PoproshaykaBot.WinForms/artifacts/*
+          path: PoproshaykaBot.Wpf/artifacts/*
           if-no-files-found: error
           retention-days: 1
 
@@ -187,7 +187,7 @@ jobs:
               <tr>
                 <td align="center">
                   <strong>🔵 Framework-dependent</strong><br/>
-                  <sub>нужен <a href="https://dotnet.microsoft.com/download/dotnet/8.0">.NET 8 Desktop Runtime</a></sub>
+                  <sub>нужен <a href="https://dotnet.microsoft.com/download/dotnet/10.0">.NET 10 Desktop Runtime</a></sub>
                 </td>
                 <td align="center">
                   <a href="${BASE}/PoproshaykaBot-v${VERSION}-x64.exe"><img src="https://img.shields.io/badge/⬇️_EXE-1f6feb?style=for-the-badge" alt="Framework-dependent x64 EXE" /></a>

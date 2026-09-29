@@ -9,7 +9,7 @@ public sealed class PollChatTemplatesSettings
     public string ProgressTemplate { get; set; } = "📊 Пока что лидирует «{leader}» ({leaderVotes}/{totalVotes}).";
 
     public bool EndEnabled { get; set; } = true;
-    public string EndTemplate { get; set; } = "🏁 Голосование завершено: победил «{winner}» — {winnerVotes} из {totalVotes}.";
+    public string EndTemplate { get; set; } = "🏁 Голосование завершено: победил «{winner}» – {winnerVotes} из {totalVotes}.";
 
     public bool TerminatedEnabled { get; set; } = true;
     public string TerminatedTemplate { get; set; } = "⛔ Голосование «{title}» завершено досрочно.";

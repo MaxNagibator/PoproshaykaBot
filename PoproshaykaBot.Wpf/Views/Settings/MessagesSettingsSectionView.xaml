@@ -1,0 +1,79 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Settings.MessagesSettingsSectionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Settings"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:MessagesSettingsSectionViewModel}"
+             d:DesignHeight="600"
+             d:DesignWidth="700">
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="MessageEntryTemplate"
+                      DataType="{x:Type vm:MessageEntryViewModel}">
+            <Border Style="{StaticResource Card}"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0"
+                               LastChildFill="True">
+                        <Button DockPanel.Dock="Right"
+                                Style="{StaticResource Button.Icon}"
+                                Command="{Binding ResetCommand}"
+                                ToolTip="Сбросить к значению по умолчанию"
+                                Margin="8,0,0,0">
+                            <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCcw}"
+                                                     Width="14"
+                                                     Height="14" />
+                        </Button>
+
+                        <CheckBox DockPanel.Dock="Left"
+                                  Style="{StaticResource CheckBox.Default}"
+                                  IsChecked="{Binding IsEnabled}"
+                                  Visibility="{Binding HasEnabledToggle, Converter={StaticResource BoolToVisibility}}"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,8,0" />
+
+                        <TextBlock Text="{Binding Label}"
+                                   FontSize="{DynamicResource Font.Size.S}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Fg.Primary}"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <TextBox Grid.Row="2"
+                             AutomationProperties.Name="{Binding Label}"
+                             Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                             keepshell:PlaceholderBehavior.Placeholder="{Binding Placeholder}">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox"
+                                   BasedOn="{StaticResource TextBox.Form}">
+                                <Setter Property="IsEnabled"
+                                        Value="{Binding IsEnabled}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasEnabledToggle}"
+                                                 Value="False">
+                                        <Setter Property="IsEnabled"
+                                                Value="True" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ItemsControl ItemsSource="{Binding Entries}"
+                 
+                  ItemTemplate="{StaticResource MessageEntryTemplate}" />
+</UserControl>

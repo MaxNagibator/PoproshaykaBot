@@ -14,6 +14,6 @@ public static partial class QueryStringMasker
         return SecretPattern().Replace(queryString, m => $"{m.Groups[1].Value}=***");
     }
 
-    [GeneratedRegex(@"(?i)\b(code|access_token|refresh_token)=([^&]+)", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(?i)(?<=^|[?&])(code|access_token|refresh_token|u)=([^&]+)", RegexOptions.CultureInvariant)]
     private static partial Regex SecretPattern();
 }

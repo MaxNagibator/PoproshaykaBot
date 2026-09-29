@@ -1,4 +1,6 @@
-﻿using PoproshaykaBot.Core.Infrastructure.Hosting;
+﻿using Microsoft.Extensions.Logging;
+using PoproshaykaBot.Core.Infrastructure.Hosting;
+using PoproshaykaBot.Core.Tests.Server;
 
 namespace PoproshaykaBot.Core.Tests.Infrastructure.Hosting;
 
@@ -147,6 +149,31 @@ public sealed class AppHostTests
         await host.StartAsync(CancellationToken.None);
 
         Assert.That(trace, Is.EqualTo(["start:a"]));
+    }
+
+    [Test]
+    public void StartAsync_ComponentThrows_LogsComponentNameAndRethrows()
+    {
+        var trace = new List<string>();
+        var logger = new RecordingLogger<AppHost>();
+        var components = new IHostedComponent[]
+        {
+            new RecordingComponent("a", 100, trace),
+            new RecordingComponent("падающий", 200, trace) { ThrowOnStart = true },
+        };
+
+        var host = new AppHost(components, logger);
+
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync(CancellationToken.None));
+
+        var error = logger.Entries.SingleOrDefault(entry => entry.Level == LogLevel.Error);
+
+        Assert.That(error, Is.Not.Null, "Падение компонента должно попадать в лог с уровнем Error");
+        Assert.Multiple(() =>
+        {
+            Assert.That(error.Message, Does.Contain("падающий"));
+            Assert.That(error.Exception, Is.InstanceOf<InvalidOperationException>());
+        });
     }
 
     private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>

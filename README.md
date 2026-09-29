@@ -33,7 +33,7 @@ Twitch-чат-бот с OBS-оверлеем для Windows.
     <tr>
       <td align="center">
         <strong>🔵 Framework-dependent</strong><br/>
-        <sub>нужен <a href="https://dotnet.microsoft.com/download/dotnet/8.0">.NET 8 Desktop Runtime</a></sub>
+        <sub>нужен <a href="https://dotnet.microsoft.com/download/dotnet/10.0">.NET 10 Desktop Runtime</a></sub>
       </td>
       <td align="center">
         <a href="https://github.com/TheVSAKeeper/PoproshaykaBot/releases/latest"><img src="https://img.shields.io/badge/⬇️_EXE-1f6feb?style=for-the-badge" alt="Скачать Framework-dependent x64 EXE" /></a>

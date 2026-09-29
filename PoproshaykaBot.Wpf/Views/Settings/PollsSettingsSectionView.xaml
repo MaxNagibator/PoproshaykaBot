@@ -1,0 +1,163 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Settings.PollsSettingsSectionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Settings"
+             xmlns:controls="clr-namespace:KeepShell.Views.Controls;assembly=KeepShell"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:PollsSettingsSectionViewModel}"
+             d:DesignHeight="720"
+             d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/PoproshaykaBot.Wpf;component/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+
+        <StackPanel>
+            <TextBlock Text="Автопост в чат"
+                       Style="{StaticResource Setting.BlockTitle}" />
+
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Style="{StaticResource CheckBox.Default}"
+                          Content="Старт"
+                          IsChecked="{Binding StartEnabled}"
+                          VerticalAlignment="Center" />
+                <TextBox Grid.Column="1"
+                         Style="{StaticResource TextBox.Form}"
+                         AutomationProperties.Name="Шаблон сообщения о старте опроса"
+                         Text="{Binding StartTemplate, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding StartEnabled}"
+                         keepshell:PlaceholderBehavior.Placeholder="Шаблон при старте голосования" />
+            </Grid>
+
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Style="{StaticResource CheckBox.Default}"
+                          Content="Прогресс"
+                          IsChecked="{Binding ProgressEnabled}"
+                          VerticalAlignment="Center" />
+                <TextBox Grid.Column="1"
+                         Style="{StaticResource TextBox.Form}"
+                         AutomationProperties.Name="Шаблон сообщения о ходе опроса"
+                         Text="{Binding ProgressTemplate, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding ProgressEnabled}"
+                         keepshell:PlaceholderBehavior.Placeholder="Шаблон промо-сообщения о прогрессе" />
+            </Grid>
+
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Style="{StaticResource CheckBox.Default}"
+                          Content="Финал"
+                          IsChecked="{Binding EndEnabled}"
+                          VerticalAlignment="Center" />
+                <TextBox Grid.Column="1"
+                         Style="{StaticResource TextBox.Form}"
+                         AutomationProperties.Name="Шаблон сообщения о финале опроса"
+                         Text="{Binding EndTemplate, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding EndEnabled}"
+                         keepshell:PlaceholderBehavior.Placeholder="Шаблон при завершении голосования" />
+            </Grid>
+
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Style="{StaticResource CheckBox.Default}"
+                          Content="Досрочное"
+                          IsChecked="{Binding TerminatedEnabled}"
+                          VerticalAlignment="Center" />
+                <TextBox Grid.Column="1"
+                         Style="{StaticResource TextBox.Form}"
+                         AutomationProperties.Name="Шаблон сообщения о досрочном завершении опроса"
+                         Text="{Binding TerminatedTemplate, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding TerminatedEnabled}"
+                         keepshell:PlaceholderBehavior.Placeholder="Шаблон при досрочном завершении" />
+            </Grid>
+
+            <Grid Margin="0,0,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Style="{StaticResource CheckBox.Default}"
+                          Content="Архив"
+                          IsChecked="{Binding ArchivedEnabled}"
+                          VerticalAlignment="Center" />
+                <TextBox Grid.Column="1"
+                         Style="{StaticResource TextBox.Form}"
+                         AutomationProperties.Name="Шаблон сообщения об архивации опроса"
+                         Text="{Binding ArchivedTemplate, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding ArchivedEnabled}"
+                         keepshell:PlaceholderBehavior.Placeholder="Шаблон при архивировании" />
+            </Grid>
+        </StackPanel>
+
+        <StackPanel>
+            <TextBlock Text="Параметры"
+                       Style="{StaticResource Setting.BlockTitle}" />
+
+            <controls:NumericSettingField Label="Promo-интервал (сек)"
+                                          Value="{Binding ProgressIntervalSeconds, Mode=TwoWay}"
+                                          IncreaseCommand="{Binding IncreaseProgressIntervalCommand}"
+                                          DecreaseCommand="{Binding DecreaseProgressIntervalCommand}"
+                                          IncreaseAutomationName="Увеличить интервал промо"
+                                          DecreaseAutomationName="Уменьшить интервал промо"
+                                          Margin="0,0,0,12" />
+
+            <controls:NumericSettingField Label="Макс. записей истории"
+                                          Value="{Binding HistoryMaxItems, Mode=TwoWay}"
+                                          IncreaseCommand="{Binding IncreaseHistoryMaxCommand}"
+                                          DecreaseCommand="{Binding DecreaseHistoryMaxCommand}"
+                                          IncreaseAutomationName="Увеличить лимит истории"
+                                          DecreaseAutomationName="Уменьшить лимит истории"
+                                          Margin="0,0,0,12" />
+
+            <CheckBox Style="{StaticResource CheckBox.Default}"
+                      Content="Отключить авто-голосования на сегодня"
+                      IsChecked="{Binding KillSwitchToday}" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding Notice}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,8"
+                   Foreground="{DynamicResource State.WarningText}"
+                   AutomationProperties.LiveSetting="Polite"
+                   Visibility="{Binding Notice, Converter={StaticResource NullToVisibility}}" />
+
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Style="{StaticResource Button.Secondary}"
+                    Content="Отмена"
+                    Command="{Binding RevertCommand}"
+                    Margin="0,0,8,0" />
+            <Button Style="{StaticResource Button.Primary}"
+                    Content="Сохранить"
+                    Command="{Binding SaveCommand}" />
+        </StackPanel>
+
+    </StackPanel>
+</UserControl>

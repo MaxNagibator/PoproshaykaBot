@@ -69,11 +69,11 @@ public class BroadcastProfilesManager(
             profileToApply = profile;
         }
 
-        _ = eventBus.PublishAsync(new BroadcastProfileApplying(profileToApply));
+        _ = eventBus.PublishAsync(new BroadcastProfileApplying(profileToApply), cancellationToken);
 
         var success = await applier.ApplyAsync(profileToApply, cancellationToken);
 
-        profilesStore.Mutate(bp =>
+        var written = profilesStore.Mutate(bp =>
         {
             bp.LastAppliedProfileId = profile.Id;
 
@@ -87,10 +87,11 @@ public class BroadcastProfilesManager(
             }
         });
 
-        logger.LogInformation("Профиль трансляции применён: {ProfileName} (Id={ProfileId}, success={Success})",
+        logger.LogInformation("Профиль трансляции применён: {ProfileName} (Id={ProfileId}, success={Success}, {Outcome})",
             profile.Name,
             profile.Id,
-            success);
+            success,
+            written ? "отметка применения записана" : "отметка применения принята только в памяти до перезапуска");
 
         return profile;
     }
@@ -104,31 +105,36 @@ public class BroadcastProfilesManager(
 
     public virtual bool AdvanceCurrentNumber(Guid id, int expectedCurrentNumber, int nextValue, DateTimeOffset advancedAt)
     {
-        var outcome = profilesStore.Mutate(bp =>
+        var outcome = AdvanceOutcome.NotFound;
+
+        var written = profilesStore.Mutate(bp =>
         {
             var stored = bp.Profiles.FirstOrDefault(p => p.Id == id);
 
             if (stored == null)
             {
-                return AdvanceOutcome.NotFound;
+                outcome = AdvanceOutcome.NotFound;
+                return;
             }
 
             if (stored.CurrentNumber != expectedCurrentNumber)
             {
-                return AdvanceOutcome.RaceDetected;
+                outcome = AdvanceOutcome.RaceDetected;
+                return;
             }
 
             stored.CurrentNumber = nextValue;
             stored.LastAutoAdvanceAt = advancedAt;
-            return AdvanceOutcome.Advanced;
+            outcome = AdvanceOutcome.Advanced;
         });
 
         switch (outcome)
         {
             case AdvanceOutcome.Advanced:
-                logger.LogDebug("AdvanceCurrentNumber: профиль Id={ProfileId} → CurrentNumber={NextValue}",
+                logger.LogDebug("AdvanceCurrentNumber: профиль Id={ProfileId} → CurrentNumber={NextValue}, {Outcome}",
                     id,
-                    nextValue);
+                    nextValue,
+                    written ? "записано" : "принято только в памяти до перезапуска");
 
                 return true;
 
@@ -146,14 +152,14 @@ public class BroadcastProfilesManager(
         return profilesStore.Load().Profiles.ToList();
     }
 
-    public void Upsert(BroadcastProfile profile)
+    public bool Upsert(BroadcastProfile profile)
     {
         if (string.IsNullOrWhiteSpace(profile.Name))
         {
             throw new InvalidOperationException("Имя профиля не может быть пустым");
         }
 
-        profilesStore.Mutate(bp =>
+        var written = profilesStore.Mutate(bp =>
         {
             var profiles = bp.Profiles;
 
@@ -192,20 +198,22 @@ public class BroadcastProfilesManager(
 
         logger.LogInformation("Upsert профиля трансляции {ProfileName} (Id={ProfileId})", profile.Name, profile.Id);
         _ = eventBus.PublishAsync(new BroadcastProfilesChanged());
+
+        return written;
     }
 
-    public void Remove(Guid id)
+    public bool Remove(Guid id)
     {
-        var removed = profilesStore.Mutate(bp =>
+        var removed = 0;
+
+        var written = profilesStore.Mutate(bp =>
         {
-            var count = bp.Profiles.RemoveAll(p => p.Id == id);
+            removed = bp.Profiles.RemoveAll(p => p.Id == id);
 
             if (bp.LastAppliedProfileId == id)
             {
                 bp.LastAppliedProfileId = null;
             }
-
-            return count;
         });
 
         if (removed > 0)
@@ -214,9 +222,11 @@ public class BroadcastProfilesManager(
         }
         else
         {
-            logger.LogDebug("Запрос на удаление профиля трансляции Id={ProfileId} — записей не найдено", id);
+            logger.LogDebug("Запрос на удаление профиля трансляции Id={ProfileId} – записей не найдено", id);
         }
 
         _ = eventBus.PublishAsync(new BroadcastProfilesChanged());
+
+        return written;
     }
 }

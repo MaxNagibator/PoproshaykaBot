@@ -33,7 +33,7 @@ public sealed class StaticAssetsEndpointTests
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
         Assert.That(bytes, Is.Not.Empty,
-            "Embedded-asset не должен быть пустым — это значит, что <EmbeddedResource> в Core.csproj отвалился");
+            "Embedded-asset не должен быть пустым – это значит, что <EmbeddedResource> в Core.csproj отвалился");
     }
 
     [Test]

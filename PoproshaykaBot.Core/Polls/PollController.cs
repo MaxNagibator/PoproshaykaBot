@@ -72,7 +72,7 @@ public sealed class PollController(
             try
             {
                 var info = await helix.CreatePollAsync(request, cancellationToken);
-                var snapshot = PollEventSubMapper.FromHelix(info, profile.Id);
+                var snapshot = PollEventSubMapper.FromCreatedPoll(info, profile.Id);
 
                 snapshotStore.Set(snapshot);
                 await eventBus.PublishAsync(new PollStarted(snapshot), cancellationToken);

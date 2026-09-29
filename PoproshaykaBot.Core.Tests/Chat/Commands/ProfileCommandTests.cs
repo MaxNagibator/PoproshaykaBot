@@ -41,9 +41,9 @@ public class ProfileCommandTests
     private ProfileCommand _command = null!;
 
     [Test]
-    public void Canonical_IsProfile()
+    public void Canonical_IsPreset()
     {
-        Assert.That(_command.Canonical, Is.EqualTo("profile"));
+        Assert.That(_command.Canonical, Is.EqualTo("пресет"));
     }
 
     [Test]
@@ -81,7 +81,7 @@ public class ProfileCommandTests
         var response = await _command.ExecuteAsync(ctx, CancellationToken.None);
 
         Assert.That(response, Is.Not.Null);
-        Assert.That(response!.Text, Does.Contain("!profile"));
+        Assert.That(response!.Text, Does.Contain("!пресет"));
     }
 
     [Test]

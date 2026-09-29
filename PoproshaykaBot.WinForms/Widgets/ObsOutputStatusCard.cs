@@ -60,7 +60,7 @@ public sealed partial class ObsOutputStatusCard : UserControl
         var nextState = ResolveState(active, paused);
         _state = nextState;
         _timecodeLabel.Text = string.IsNullOrWhiteSpace(timecode)
-            ? "—:—:—"
+            ? "–:–:–"
             : FormatTimecode(timecode);
 
         _metaLabel.Text = meta ?? string.Empty;
@@ -71,8 +71,8 @@ public sealed partial class ObsOutputStatusCard : UserControl
 
     public void ApplyUnavailable(string? errorMessage)
     {
-        _state = ObsOutputCardState.Error;
-        _timecodeLabel.Text = "—:—:—";
+        _state = ObsOutputCardState.Unknown;
+        _timecodeLabel.Text = "–:–:–";
         _metaLabel.Text = string.IsNullOrWhiteSpace(errorMessage) ? "OBS недоступен" : errorMessage;
         _secondaryChip = null;
         _secondaryChipTone = ObsCardChipTone.Neutral;
@@ -82,7 +82,7 @@ public sealed partial class ObsOutputStatusCard : UserControl
     public void ApplyUnknown()
     {
         _state = ObsOutputCardState.Unknown;
-        _timecodeLabel.Text = "—:—:—";
+        _timecodeLabel.Text = "–:–:–";
         _metaLabel.Text = string.Empty;
         _secondaryChip = null;
         _secondaryChipTone = ObsCardChipTone.Neutral;
@@ -351,13 +351,13 @@ public sealed partial class ObsOutputStatusCard : UserControl
     {
         return (_kind, _state) switch
         {
-            (_, ObsOutputCardState.Unknown) => "—",
+            (_, ObsOutputCardState.Unknown) => "–",
             (_, ObsOutputCardState.Idle) => "Готов",
             (ObsOutputCardKind.Stream, ObsOutputCardState.Active) => "В ЭФИРЕ",
             (ObsOutputCardKind.Record, ObsOutputCardState.Active) => "ЗАПИСЬ",
             (_, ObsOutputCardState.Paused) => "ПАУЗА",
             (_, ObsOutputCardState.Error) => "Ошибка",
-            _ => "—",
+            _ => "–",
         };
     }
 
@@ -370,7 +370,7 @@ public sealed partial class ObsOutputStatusCard : UserControl
             (ObsOutputCardKind.Record, ObsOutputCardState.Idle) => ("● Старт", true, Color.Green),
             (ObsOutputCardKind.Record, ObsOutputCardState.Active) => ("■ Стоп", true, Color.Red),
             (ObsOutputCardKind.Record, ObsOutputCardState.Paused) => ("■ Стоп", true, Color.Red),
-            _ => ("—", false, Color.Gray),
+            _ => ("–", false, Color.Gray),
         };
 
         _primaryButton.Text = text;
@@ -430,13 +430,13 @@ public sealed partial class ObsOutputStatusCard : UserControl
             ObsOutputCardState.Active => ("в эфире", Color.Green),
             ObsOutputCardState.Idle => ("офлайн", Color.Gray),
             ObsOutputCardState.Error => ("OBS WS", Color.Red),
-            _ => ("—", Color.Silver),
+            _ => ("–", Color.Silver),
         };
     }
 
     private void SetButtonsEnabled(bool enabled)
     {
-        _primaryButton.Enabled = enabled && _primaryButton.Text != "—";
+        _primaryButton.Enabled = enabled && _primaryButton.Text != "–";
         _secondaryButton.Enabled = enabled
                                    && _kind == ObsOutputCardKind.Record
                                    && _state is ObsOutputCardState.Active or ObsOutputCardState.Paused;

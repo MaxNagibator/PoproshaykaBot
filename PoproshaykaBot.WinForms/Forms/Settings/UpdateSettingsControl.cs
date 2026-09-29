@@ -206,7 +206,7 @@ public sealed partial class UpdateSettingsControl : UserControl
         if (text.Length == 0)
         {
             _repositoryHintLabel.ForeColor = Color.Gray;
-            _repositoryHintLabel.Text = $"Пусто — используется {Updates.DefaultRepositorySlug} (из сборки).";
+            _repositoryHintLabel.Text = $"Пусто – используется {Updates.DefaultRepositorySlug} (из сборки).";
         }
         else if (UpdateRepository.IsValidSlug(text))
         {

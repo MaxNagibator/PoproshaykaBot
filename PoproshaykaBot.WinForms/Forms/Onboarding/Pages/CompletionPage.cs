@@ -61,9 +61,9 @@ public sealed partial class CompletionPage : OnboardingPageBase
     {
         _context = context;
 
-        var botLogin = string.IsNullOrWhiteSpace(context.BotAccount.Login) ? "—" : context.BotAccount.Login;
+        var botLogin = string.IsNullOrWhiteSpace(context.BotAccount.Login) ? "–" : context.BotAccount.Login;
         var broadcasterLogin = string.IsNullOrWhiteSpace(context.BroadcasterAccount.Login)
-            ? "—"
+            ? "–"
             : context.BroadcasterAccount.Login;
 
         _summaryLabel.Text =
@@ -201,7 +201,7 @@ public sealed partial class CompletionPage : OnboardingPageBase
 
         return new("Канал и стример",
             ValidationStatus.Warning,
-            $"канал «{channel}» и логин стримера «@{broadcasterLogin}» различаются — проверьте, что это намеренно.");
+            $"канал «{channel}» и логин стримера «@{broadcasterLogin}» различаются – проверьте, что это намеренно.");
     }
 
     private static string FormatLine(ValidationLine line)
@@ -335,7 +335,7 @@ public sealed partial class CompletionPage : OnboardingPageBase
             {
                 ChannelValidationResult.Found => (ValidationStatus.Success, $"найден @{channel}", result),
                 ChannelValidationResult.NotFound => (ValidationStatus.Failure,
-                    $"канал «{channel}» не найден. Возможно, имя написано с ошибкой — вернитесь на шаг учётных данных.",
+                    $"канал «{channel}» не найден. Возможно, имя написано с ошибкой – вернитесь на шаг учётных данных.",
                     result),
                 _ => (ValidationStatus.Skipped, "не удалось проверить (сеть)", result),
             };
@@ -399,7 +399,7 @@ public sealed partial class CompletionPage : OnboardingPageBase
             MessageBox.Show(this,
                 $"""
                  HTTP сервер не удалось перезапустить на порту {newPort}.
-                 Настройки сохранены — потребуется перезапуск приложения.
+                 Настройки сохранены – потребуется перезапуск приложения.
                  """,
                 "Внимание",
                 MessageBoxButtons.OK,

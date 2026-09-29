@@ -15,7 +15,7 @@ public sealed class LastStreamCommand(StreamSessionHistoryStore historyStore) : 
 
     public Task<OutgoingMessage?> ExecuteAsync(CommandContext context, CancellationToken cancellationToken)
     {
-        var sessions = historyStore.Load().Sessions;
+        var sessions = historyStore.LoadVisible().Sessions;
 
         if (sessions.Count == 0)
         {

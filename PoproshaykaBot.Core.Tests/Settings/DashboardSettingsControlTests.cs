@@ -63,7 +63,7 @@ public sealed class DashboardSettingsControlTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(saved.Tiles, Has.Count.EqualTo(2),
-                "Контрол не открывался — должен сохранить layout, который мы загрузили, а не пустоту.");
+                "Контрол не открывался – должен сохранить layout, который мы загрузили, а не пустоту.");
 
             Assert.That(saved.ColumnCount, Is.EqualTo(5));
             Assert.That(saved.RowCount, Is.EqualTo(4));

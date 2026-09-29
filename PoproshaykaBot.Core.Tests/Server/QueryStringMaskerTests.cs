@@ -33,6 +33,21 @@ public sealed class QueryStringMaskerTests
         Assert.That(QueryStringMasker.Mask(input), Is.EqualTo(expected));
     }
 
+    [TestCase("?u=https%3A%2F%2Fi.imgur.com%2Fabc.png", "?u=***")]
+    [TestCase("?u=https%3A%2F%2Fi.imgur.com%2Fabc.png&x=1", "?u=***&x=1")]
+    [TestCase("?x=1&u=https%3A%2F%2Fi.imgur.com%2Fabc.png", "?x=1&u=***")]
+    public void Mask_ImageProxyUrl_IsRedacted(string input, string expected)
+    {
+        Assert.That(QueryStringMasker.Mask(input), Is.EqualTo(expected));
+    }
+
+    [TestCase("?menu=main")]
+    [TestCase("?value=u")]
+    public void Mask_KeysEndingWithU_AreLeftAlone(string input)
+    {
+        Assert.That(QueryStringMasker.Mask(input), Is.EqualTo(input));
+    }
+
     [Test]
     public void Mask_IsCaseInsensitiveOnKey()
     {

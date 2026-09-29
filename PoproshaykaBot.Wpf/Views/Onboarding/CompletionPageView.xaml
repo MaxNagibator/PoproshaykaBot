@@ -1,0 +1,73 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Onboarding.CompletionPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Onboarding"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:CompletionPageViewModel}"
+             d:DesignHeight="420"
+             d:DesignWidth="688">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="20,18">
+
+            <TextBlock Text="Всё готово к запуску!"
+                       FontWeight="Bold"
+                       FontSize="{DynamicResource Font.Size.L}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,12" />
+
+            <TextBlock Text="{Binding SummaryText}"
+                       Foreground="{DynamicResource Fg.Primary}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,16" />
+
+            <TextBlock Text="Результат проверки"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       FontSize="{DynamicResource Font.Size.S}"
+                       Margin="0,0,0,4" />
+
+            <TextBlock Text="{Binding ValidationText}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,16">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource State.SuccessText}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsValidationPending}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource Fg.Secondary}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsValidationWarning}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource State.WarningText}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsValidationFailure}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource State.ErrorText}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <TextBlock Text="Аккаунт для отображения чата"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       FontSize="{DynamicResource Font.Size.S}"
+                       Margin="0,0,0,6" />
+
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,0,0,16">
+                <RadioButton Content="Аккаунт бота"
+                             IsChecked="{Binding ChatDisplayAccount, Converter={StaticResource EnumToBoolean}, ConverterParameter=Bot}"
+                             Margin="0,0,16,0" />
+                <RadioButton Content="Аккаунт стримера"
+                             IsChecked="{Binding ChatDisplayAccount, Converter={StaticResource EnumToBoolean}, ConverterParameter=Broadcaster}" />
+            </StackPanel>
+
+            <CheckBox Content="Подключить бота автоматически после завершения"
+                      IsChecked="{Binding AutoConnect, Mode=TwoWay}"
+                      Margin="0,0,0,4" />
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

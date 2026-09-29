@@ -45,6 +45,32 @@ internal static class StreamInfoMapper
         };
     }
 
+    public static bool SameSnapshot(StreamInfo? left, StreamInfo? right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return true;
+        }
+
+        if (left is null || right is null)
+        {
+            return false;
+        }
+
+        return string.Equals(left.Id, right.Id, StringComparison.Ordinal)
+               && string.Equals(left.UserId, right.UserId, StringComparison.Ordinal)
+               && string.Equals(left.UserLogin, right.UserLogin, StringComparison.Ordinal)
+               && string.Equals(left.UserName, right.UserName, StringComparison.Ordinal)
+               && string.Equals(left.GameId, right.GameId, StringComparison.Ordinal)
+               && string.Equals(left.GameName, right.GameName, StringComparison.Ordinal)
+               && string.Equals(left.Title, right.Title, StringComparison.Ordinal)
+               && string.Equals(left.Language, right.Language, StringComparison.Ordinal)
+               && string.Equals(left.ThumbnailUrl, right.ThumbnailUrl, StringComparison.Ordinal)
+               && left.StartedAt == right.StartedAt
+               && left.IsMature == right.IsMature
+               && left.Tags.SequenceEqual(right.Tags, StringComparer.Ordinal);
+    }
+
     public static StreamInfo MergeChannelUpdate(StreamInfo source, ChannelUpdated update)
     {
         var merged = Clone(source);

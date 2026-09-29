@@ -8,6 +8,19 @@ public sealed class ObsChatSettings
                                             "Motiva Sans", "Inter", "Noto Sans", Arial, sans-serif
                                             """;
 
+    public static readonly IReadOnlyList<string> DefaultMessageImageAllowedHosts =
+    [
+        "i.imgur.com",
+        "imgur.com",
+        "static-cdn.jtvnw.net",
+        "clips-media-assets2.twitch.tv",
+        "cdn.7tv.app",
+        "media.discordapp.net",
+    ];
+
+    public const MessageImageSenderRoles DefaultMessageImageRoles =
+        MessageImageSenderRoles.Broadcaster | MessageImageSenderRoles.Moderator | MessageImageSenderRoles.Vip;
+
     public Color BackgroundColor { get; set; } = Color.FromArgb(179, 0, 0, 0);
     public Color TextColor { get; set; } = Color.FromArgb(255, 255, 255);
     public Color UsernameColor { get; set; } = Color.FromArgb(145, 70, 255);
@@ -33,6 +46,11 @@ public sealed class ObsChatSettings
 
     public bool ShowUserAvatars { get; set; } = false;
     public int UserAvatarSizePixels { get; set; } = 32;
+
+    public bool ShowMessageImages { get; set; } = false;
+    public MessageImageSenderRoles MessageImageRoles { get; set; } = DefaultMessageImageRoles;
+    public List<string> MessageImageAllowedHosts { get; set; } = [..DefaultMessageImageAllowedHosts];
+    public int MessageImageMaxHeightPixels { get; set; } = 160;
 
     public bool ShowUserTypeBorders { get; set; } = true;
     public bool HighlightFirstTimeUsers { get; set; } = true;

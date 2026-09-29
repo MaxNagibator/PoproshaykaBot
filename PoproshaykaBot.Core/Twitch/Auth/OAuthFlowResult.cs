@@ -6,4 +6,18 @@ public sealed record OAuthFlowResult(
     string[] Scopes,
     string Login,
     string UserId,
-    int ExpiresInSeconds);
+    int ExpiresInSeconds)
+{
+    public void ApplyTo(TwitchAccountSettings account, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+
+        account.AccessToken = AccessToken;
+        account.RefreshToken = RefreshToken;
+        account.Login = Login;
+        account.UserId = UserId;
+        account.Scopes = [..Scopes];
+        account.StoredScopes = [..Scopes];
+        account.AccessTokenExpiresAt = ExpiresInSeconds > 0 ? now.AddSeconds(ExpiresInSeconds) : null;
+    }
+}

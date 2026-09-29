@@ -1,0 +1,52 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Onboarding.HttpServerCheckPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Onboarding"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:HttpServerCheckPageViewModel}"
+             d:DesignHeight="376"
+             d:DesignWidth="688">
+
+    <StackPanel Margin="20,18">
+
+        <Border Background="{DynamicResource Bg.SurfaceAlt}"
+                BorderBrush="{DynamicResource Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource Radius.S}"
+                Padding="14,12"
+                Margin="0,0,0,16">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,6">
+                    <TextBlock Text="Статус:"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               Width="120"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding StatusText}"
+                               keepshell:SeverityBrushBehavior.Foreground="{Binding StatusSeverity}"
+                               FontWeight="SemiBold"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+                <TextBlock Text="{Binding DetailsText}"
+                           Foreground="{DynamicResource Fg.Secondary}"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding DetailsText, Converter={StaticResource NullToVisibility}}" />
+            </StackPanel>
+        </Border>
+
+        <Button Content="Повторить проверку"
+                Style="{StaticResource Button.Secondary}"
+                Command="{Binding RetryCommand}"
+                Visibility="{Binding IsRetryVisible, Converter={StaticResource BoolToVisibility}}"
+                HorizontalAlignment="Left" />
+
+    </StackPanel>
+</UserControl>

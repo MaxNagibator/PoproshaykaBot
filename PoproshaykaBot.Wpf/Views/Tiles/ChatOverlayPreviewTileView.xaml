@@ -1,0 +1,88 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Tiles.ChatOverlayPreviewTileView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Tiles"
+             xmlns:controls="clr-namespace:KeepShell.Views.Controls;assembly=KeepShell"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ChatOverlayPreviewTileViewModel}"
+             d:DesignWidth="380"
+             d:DesignHeight="460">
+
+    <Grid>
+        <wv2:WebView2 x:Name="WebView">
+            <wv2:WebView2.Style>
+                <Style TargetType="wv2:WebView2">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasError}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsLayoutEditing}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsModalDialogOpen}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </wv2:WebView2.Style>
+        </wv2:WebView2>
+
+        <controls:EmptyState Icon="Monitor"
+                             Heading="Превью скрыто"
+                             DescriptionMaxWidth="300"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Center">
+            <controls:EmptyState.Style>
+                <Style TargetType="controls:EmptyState">
+                    <Setter Property="Visibility"
+                            Value="Collapsed" />
+                    <Setter Property="Description"
+                            Value="Превью оверлея вернётся, когда закончится настройка дашборда." />
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsLayoutEditing}"
+                                           Value="True" />
+                                <Condition Binding="{Binding HasError}"
+                                           Value="False" />
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility"
+                                    Value="Visible" />
+                        </MultiDataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsModalDialogOpen}"
+                                           Value="True" />
+                                <Condition Binding="{Binding HasError}"
+                                           Value="False" />
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility"
+                                    Value="Visible" />
+                            <Setter Property="Description"
+                                    Value="Превью оверлея вернётся, когда закроется диалог." />
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </controls:EmptyState.Style>
+        </controls:EmptyState>
+
+        <controls:EmptyState Icon="MonitorOff"
+                             Heading="{Binding ErrorHeading}"
+                             Description="{Binding ErrorDescription}"
+                             DescriptionMaxWidth="300"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Center"
+                             Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+    </Grid>
+</UserControl>

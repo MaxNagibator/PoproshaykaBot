@@ -1,0 +1,53 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Onboarding.AuthorizationPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Onboarding"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:BotAuthorizationPageViewModel}"
+             d:DesignHeight="376"
+             d:DesignWidth="688">
+
+    <StackPanel Margin="20,18">
+        <TextBlock Text="{Binding IntroText}"
+                   Foreground="{DynamicResource Fg.Primary}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,16" />
+
+        <StackPanel Orientation="Horizontal"
+                    Margin="0,0,0,8">
+            <Button Style="{StaticResource Button.Primary}"
+                    Content="{Binding EmbeddedAuthButtonText}"
+                    Command="{Binding AuthorizeInAppCommand}"
+                    ToolTip="Страница авторизации Twitch откроется во встроенном окне приложения."
+                    Margin="0,0,8,0" />
+            <Button Style="{StaticResource Button.Secondary}"
+                    Content="{Binding OpenBrowserButtonText}"
+                    Command="{Binding OpenBrowserCommand}"
+                    ToolTip="Откроется системный браузер на странице авторизации Twitch."
+                    Margin="0,0,8,0" />
+            <Button Style="{StaticResource Button.Secondary}"
+                    Content="{Binding CopyLinkButtonText}"
+                    Command="{Binding CopyLinkCommand}"
+                    ToolTip="Скопировать ссылку авторизации в буфер обмена."
+                    Margin="0,0,8,0" />
+            <Button Style="{StaticResource Button.Destructive}"
+                    Content="Отменить"
+                    Command="{Binding CancelAuthCommand}"
+                    Visibility="{Binding IsAuthInProgress, Converter={StaticResource BoolToVisibility}}" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   FontSize="{DynamicResource Font.Size.S}"
+                   keepshell:SeverityBrushBehavior.Foreground="{Binding StatusMessageSeverity}"
+                   Margin="0,0,0,8" />
+
+        <TextBlock Text="{Binding ResultText}"
+                   TextWrapping="Wrap"
+                   FontWeight="Bold"
+                   keepshell:SeverityBrushBehavior.Foreground="{Binding ResultSeverity}" />
+    </StackPanel>
+</UserControl>

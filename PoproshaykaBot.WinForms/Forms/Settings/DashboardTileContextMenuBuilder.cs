@@ -1,4 +1,6 @@
-﻿using PoproshaykaBot.WinForms.Tiles;
+﻿using PoproshaykaBot.Core.Dashboard;
+using PoproshaykaBot.WinForms.Infrastructure;
+using PoproshaykaBot.WinForms.Tiles;
 
 namespace PoproshaykaBot.WinForms.Forms.Settings;
 
@@ -208,6 +210,8 @@ internal static class CustomSizePrompt
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
         };
+
+        OffScreenForm.PrepareIfHeadless(form);
 
         var layout = new TableLayoutPanel
         {

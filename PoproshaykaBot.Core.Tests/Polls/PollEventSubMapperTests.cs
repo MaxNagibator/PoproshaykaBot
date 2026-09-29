@@ -173,12 +173,55 @@ public class PollEventSubMapperTests
 
         var snapshot = PollEventSubMapper.FromHelix(helix, null);
 
+        Assert.That(snapshot, Is.Not.Null);
+
         using (Assert.EnterMultipleScope())
         {
             Assert.That(snapshot.Status, Is.EqualTo(PollSnapshotStatus.Active));
             Assert.That(snapshot.Choices, Has.Count.EqualTo(2));
             Assert.That(snapshot.EndsAtUtc, Is.EqualTo(snapshot.StartedAtUtc.AddSeconds(60)));
         }
+    }
+
+    [TestCase("ACTIVE", PollSnapshotStatus.Active)]
+    [TestCase("TERMINATED", PollSnapshotStatus.Terminated)]
+    [TestCase("SOMETHING_NEW", PollSnapshotStatus.Active)]
+    public void FromCreatedPoll_UnknownStatusCountsAsActive(string status, PollSnapshotStatus expected)
+    {
+        var helix = new HelixPollInfo("poll-1",
+            "1",
+            "Вопрос?",
+            [new("c1", "A", 0, 0, 0)],
+            false,
+            0,
+            status,
+            60,
+            DateTime.Parse("2026-04-24T10:00:00Z").ToUniversalTime(),
+            null);
+
+        var snapshot = PollEventSubMapper.FromCreatedPoll(helix, Guid.NewGuid());
+
+        Assert.That(snapshot.Status, Is.EqualTo(expected),
+            "Только что созданный опрос активен по определению – незнакомый статус ответа не превращает запуск в отказ");
+    }
+
+    [TestCase("SOMETHING_NEW")]
+    [TestCase("")]
+    [TestCase(null)]
+    public void FromHelix_UnknownStatus_ReturnsNull(string? status)
+    {
+        var helix = new HelixPollInfo("poll-1",
+            "1",
+            "Вопрос?",
+            [new("c1", "A", 5, 0, 0)],
+            false,
+            0,
+            status!,
+            60,
+            DateTime.Parse("2026-04-24T10:00:00Z").ToUniversalTime(),
+            DateTime.Parse("2026-04-24T10:01:00Z").ToUniversalTime());
+
+        Assert.That(PollEventSubMapper.FromHelix(helix, null), Is.Null);
     }
 
     [Test]
@@ -199,6 +242,8 @@ public class PollEventSubMapperTests
             ended);
 
         var snapshot = PollEventSubMapper.FromHelix(helix, null);
+
+        Assert.That(snapshot, Is.Not.Null);
 
         using (Assert.EnterMultipleScope())
         {

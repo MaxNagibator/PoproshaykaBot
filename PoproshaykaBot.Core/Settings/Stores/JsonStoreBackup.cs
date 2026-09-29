@@ -39,7 +39,7 @@ internal static class JsonStoreBackup
             catch (Exception readException)
             {
                 logger?.LogError(readException,
-                    "Не удалось прочитать {FilePath} для редактируемого бэкапа — бэкап не создан, чтобы не утечь сырое содержимое",
+                    "Не удалось прочитать {FilePath} для редактируемого бэкапа – бэкап не создан, чтобы не утечь сырое содержимое",
                     filePath);
 
                 return;
@@ -53,7 +53,7 @@ internal static class JsonStoreBackup
             catch (Exception redactException)
             {
                 logger?.LogError(redactException,
-                    "Сбой редактора при подготовке бэкапа {FilePath} — бэкап не создан",
+                    "Сбой редактора при подготовке бэкапа {FilePath} – бэкап не создан",
                     filePath);
 
                 return;

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using PoproshaykaBot.Core.Chat;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Lifecycle;
 using PoproshaykaBot.Core.Infrastructure.Events.Streaming;
@@ -18,6 +19,7 @@ public sealed class StreamStatusBroadcastHandler :
     private readonly IBroadcastScheduler _scheduler;
     private readonly IChatMessenger _messenger;
     private readonly IStreamStatus _streamStatus;
+    private readonly ITargetChannelProvider _targetChannelProvider;
     private readonly SettingsManager _settingsManager;
     private readonly ILogger<StreamStatusBroadcastHandler> _logger;
     private readonly IDisposable _onlineSubscription;
@@ -25,11 +27,13 @@ public sealed class StreamStatusBroadcastHandler :
     private readonly IDisposable _phaseSubscription;
 
     private bool _botConnected;
+    private bool _pendingStartNotification;
 
     public StreamStatusBroadcastHandler(
         IBroadcastScheduler scheduler,
         IChatMessenger messenger,
         IStreamStatus streamStatus,
+        ITargetChannelProvider targetChannelProvider,
         SettingsManager settingsManager,
         IEventBus eventBus,
         ILogger<StreamStatusBroadcastHandler> logger)
@@ -37,6 +41,7 @@ public sealed class StreamStatusBroadcastHandler :
         _scheduler = scheduler;
         _messenger = messenger;
         _streamStatus = streamStatus;
+        _targetChannelProvider = targetChannelProvider;
         _settingsManager = settingsManager;
         _logger = logger;
 
@@ -50,19 +55,27 @@ public sealed class StreamStatusBroadcastHandler :
         var wasConnected = _botConnected;
         _botConnected = @event.Phase == BotLifecyclePhase.Connected;
 
-        if (wasConnected || !_botConnected || _streamStatus.CurrentStatus != StreamStatus.Online)
+        if (wasConnected || !_botConnected)
         {
             return Task.CompletedTask;
         }
 
-        var channel = _settingsManager.Current.Twitch.Channel;
+        var sendNotification = _pendingStartNotification;
+        _pendingStartNotification = false;
+
+        if (_streamStatus.CurrentStatus != StreamStatus.Online)
+        {
+            return Task.CompletedTask;
+        }
+
+        var channel = _targetChannelProvider.Current.Login;
 
         if (string.IsNullOrWhiteSpace(channel))
         {
             return Task.CompletedTask;
         }
 
-        return StartBroadcast(channel, false);
+        return StartBroadcast(channel, sendNotification);
     }
 
     public Task HandleAsync(StreamWentOnline @event, CancellationToken cancellationToken)
@@ -71,7 +84,16 @@ public sealed class StreamStatusBroadcastHandler :
 
         if (!_botConnected)
         {
-            _logger.LogDebug("Бот не подключён — рассылка не запускается, уведомление не отправляется");
+            if (@event.IsCatchUp)
+            {
+                _logger.LogDebug("Бот не подключён – рассылка не запускается, уведомление не отправляется");
+            }
+            else
+            {
+                _pendingStartNotification = true;
+                _logger.LogDebug("Бот не подключён – рассылка не запускается, уведомление отложено до подключения бота");
+            }
+
             return Task.CompletedTask;
         }
 
@@ -85,15 +107,17 @@ public sealed class StreamStatusBroadcastHandler :
 
         _logger.LogInformation("Обработка события стрима OFFLINE для канала {Channel}", channel);
 
+        _pendingStartNotification = false;
+
         if (@event.IsCatchUp)
         {
-            _logger.LogDebug("Офлайн-снимок при подключении (catch-up) — рассылка не останавливается и стоп-сообщение не отправляется");
+            _logger.LogDebug("Офлайн-снимок при подключении (catch-up) – рассылка не останавливается и стоп-сообщение не отправляется");
             return Task.CompletedTask;
         }
 
         if (!_botConnected)
         {
-            _logger.LogDebug("Бот не подключён — обработка офлайн пропущена");
+            _logger.LogDebug("Бот не подключён – обработка офлайн пропущена");
             return Task.CompletedTask;
         }
 

@@ -1,95 +1,96 @@
 ﻿using Microsoft.Extensions.Logging;
+using PoproshaykaBot.Core.Dashboard;
 using PoproshaykaBot.Core.Infrastructure;
-using PoproshaykaBot.Core.Infrastructure.Persistence;
 using PoproshaykaBot.Core.Settings.Ui;
-using System.Text.Json;
 
 namespace PoproshaykaBot.Core.Settings.Stores;
 
 public class DashboardLayoutStore
 {
     private readonly ILogger<DashboardLayoutStore>? _logger;
-    private readonly string _filePath;
-    private readonly object _syncLock = new();
+    private readonly JsonStore<DashboardLayoutFileDto> _store;
 
-    private readonly DashboardLayoutFileDto _state;
-
-    public DashboardLayoutStore(ILogger<DashboardLayoutStore>? logger = null, string? filePath = null)
+    public DashboardLayoutStore(ILogger<DashboardLayoutStore>? logger = null, string? filePath = null, SettingsWriteGate? gate = null)
     {
-        _logger = logger;
-        _filePath = filePath ?? AppPaths.SettingsFile("dashboard-layout.json");
-        _state = ReadFile();
+        var path = filePath ?? AppPaths.SettingsFile("dashboard-layout.json");
 
-        _logger?.LogDebug("DashboardLayoutStore инициализирован из {FilePath}", _filePath);
+        _logger = logger;
+        _store = new(path, logger, gate: gate);
+
+        _logger?.LogDebug("DashboardLayoutStore инициализирован из {FilePath}", path);
     }
 
     public virtual DashboardLayoutSettings? LoadDashboard()
     {
-        lock (_syncLock)
+        var layout = _store.Load().Dashboard;
+
+        if (layout?.Root is { } root)
         {
-            return _state.Dashboard == null ? null : JsonStoreClone.DeepClone(_state.Dashboard);
+            layout.Root = DashboardPaneWeights.Sanitize(root);
         }
+
+        return layout;
     }
 
     public virtual MainWindowSettings? LoadMainWindow()
     {
-        lock (_syncLock)
-        {
-            return _state.MainWindow == null ? null : JsonStoreClone.DeepClone(_state.MainWindow);
-        }
+        return _store.Load().MainWindow;
     }
 
     public virtual void SaveDashboard(DashboardLayoutSettings layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
 
-        lock (_syncLock)
-        {
-            _state.Dashboard = JsonStoreClone.DeepClone(layout);
-            SaveInternal();
+        var snapshot = JsonStoreClone.DeepClone(Sanitized(layout));
+        MutateFile(state => state.Dashboard = snapshot);
 
-            _logger?.LogDebug("DashboardLayoutStore: раскладка дашборда сохранена");
-        }
+        _logger?.LogDebug("DashboardLayoutStore: раскладка дашборда сохранена");
     }
 
     public virtual void SaveMainWindow(MainWindowSettings window)
     {
         ArgumentNullException.ThrowIfNull(window);
 
-        lock (_syncLock)
-        {
-            _state.MainWindow = JsonStoreClone.DeepClone(window);
-            SaveInternal();
+        var snapshot = JsonStoreClone.DeepClone(window);
+        MutateFile(state => state.MainWindow = snapshot);
 
-            _logger?.LogDebug("DashboardLayoutStore: параметры главного окна сохранены");
-        }
+        _logger?.LogDebug("DashboardLayoutStore: параметры главного окна сохранены");
     }
 
-    private void SaveInternal()
+    private static DashboardLayoutSettings Sanitized(DashboardLayoutSettings layout)
     {
-        var json = JsonSerializer.Serialize(_state, JsonStoreOptions.Default);
-        AtomicFile.Save(_filePath, json, _logger);
+        if (layout.Root is not { } root)
+        {
+            return layout;
+        }
+
+        var sanitized = DashboardPaneWeights.Sanitize(root);
+
+        if (ReferenceEquals(sanitized, root))
+        {
+            return layout;
+        }
+
+        return new()
+        {
+            ColumnCount = layout.ColumnCount,
+            RowCount = layout.RowCount,
+            Tiles = layout.Tiles,
+            Root = sanitized,
+        };
     }
 
-    private DashboardLayoutFileDto ReadFile()
+    private void MutateFile(Action<DashboardLayoutFileDto> mutator)
     {
-        if (!File.Exists(_filePath))
+        _store.Mutate(state =>
         {
-            _logger?.LogDebug("DashboardLayoutStore: файл {FilePath} не найден, используются дефолты", _filePath);
-            return new();
-        }
+            mutator(state);
 
-        try
-        {
-            var json = File.ReadAllText(_filePath);
-            return JsonSerializer.Deserialize<DashboardLayoutFileDto>(json, JsonStoreOptions.Default) ?? new();
-        }
-        catch (Exception exception)
-        {
-            _logger?.LogError(exception, "Ошибка чтения {FilePath}, применяются дефолты", _filePath);
-            JsonStoreBackup.CreateBackup(_filePath, "invalid", _logger);
-            return new();
-        }
+            if (state.Dashboard is not null)
+            {
+                DashboardLayoutReconciler.SyncRoot(state.Dashboard);
+            }
+        });
     }
 
     private sealed class DashboardLayoutFileDto

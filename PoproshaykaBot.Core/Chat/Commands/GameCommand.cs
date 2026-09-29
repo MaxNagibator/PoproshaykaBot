@@ -9,6 +9,9 @@ public sealed class GameCommand(
     ILogger<GameCommand> logger)
     : IChatCommand
 {
+    private const int MaxCandidatesInReply = 3;
+    private const int MaxQueryInReply = 40;
+
     public string Canonical => "game";
     public IReadOnlyCollection<string> Aliases => ["игра", "категория"];
     public string Description => "обновить категорию трансляции";
@@ -29,12 +32,22 @@ public sealed class GameCommand(
 
         try
         {
-            var suggestion = await resolver.ResolveAsync(query, cancellationToken);
+            var resolution = await resolver.ResolveAsync(query, cancellationToken);
+            var suggestion = resolution.Match;
 
             if (suggestion == null)
             {
-                logger.LogInformation("Категория '{Query}' не найдена", query);
-                return OutgoingMessage.Reply($"Категория '{query}' не найдена", context.MessageId);
+                logger.LogInformation("Категория '{Query}' не найдена, похожих в поиске: {Count}", query, resolution.Candidates.Count);
+
+                var shown = query.Length > MaxQueryInReply ? query[..MaxQueryInReply] + "…" : query;
+
+                if (resolution.Candidates.Count == 0)
+                {
+                    return OutgoingMessage.Reply($"Категория '{shown}' не найдена", context.MessageId);
+                }
+
+                var similar = string.Join(", ", resolution.Candidates.Take(MaxCandidatesInReply).Select(x => x.Name));
+                return OutgoingMessage.Reply($"Категория '{shown}' не найдена. Может быть: {similar}", context.MessageId);
             }
 
             await applier.ApplyPatchAsync(null,

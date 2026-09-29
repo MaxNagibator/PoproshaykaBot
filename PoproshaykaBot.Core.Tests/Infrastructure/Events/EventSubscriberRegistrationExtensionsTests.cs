@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using PoproshaykaBot.Core.Infrastructure.Events;
 
 namespace PoproshaykaBot.Core.Tests.Infrastructure.Events;
@@ -19,7 +19,7 @@ public sealed class EventSubscriberRegistrationExtensionsTests
             Assert.That(services.Any(d => d.ServiceType == typeof(AnotherSampleSubscriber)), Is.True);
             Assert.That(services.Any(d => d.ServiceType == typeof(NonSubscriberClass)), Is.False);
             Assert.That(services.Any(d => d.ServiceType == typeof(AbstractBaseSubscriber)), Is.False,
-                "Abstract types must be skipped — they cannot be instantiated.");
+                "Abstract types must be skipped – they cannot be instantiated.");
         }
     }
 

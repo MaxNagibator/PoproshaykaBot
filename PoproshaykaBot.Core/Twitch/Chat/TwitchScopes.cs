@@ -1,4 +1,6 @@
-﻿namespace PoproshaykaBot.Core.Twitch.Chat;
+﻿using PoproshaykaBot.Core.Twitch.Auth;
+
+namespace PoproshaykaBot.Core.Twitch.Chat;
 
 public static class TwitchScopes
 {
@@ -9,12 +11,18 @@ public static class TwitchScopes
     public const string ChannelManageBroadcast = "channel:manage:broadcast";
     public const string ChannelManagePolls = "channel:manage:polls";
     public const string ChannelReadPolls = "channel:read:polls";
+    public const string UserManageWhispers = "user:manage:whispers";
 
     public static readonly IReadOnlyList<string> BotRequired =
     [
         UserReadChat,
         UserWriteChat,
         UserBot,
+    ];
+
+    public static readonly IReadOnlyList<string> BotOptional =
+    [
+        UserManageWhispers,
     ];
 
     public static readonly IReadOnlyList<string> BroadcasterRequired =
@@ -24,6 +32,13 @@ public static class TwitchScopes
         ChannelManagePolls,
         ChannelReadPolls,
     ];
+
+    public static bool IsGranted(TwitchAccountSettings account, string scope)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+
+        return account.StoredScopes.Contains(scope, StringComparer.Ordinal);
+    }
 
     public static bool SetEquals(IEnumerable<string> left, IEnumerable<string> right)
     {

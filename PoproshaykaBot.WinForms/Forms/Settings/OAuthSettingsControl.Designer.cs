@@ -113,7 +113,7 @@
             _channelHintLabel.Padding = new Padding(0);
             _channelHintLabel.Size = new Size(550, 15);
             _channelHintLabel.TabIndex = 0;
-            _channelHintLabel.Text = "Канал: —";
+            _channelHintLabel.Text = "Канал: –";
             _channelHintLabel.TextAlign = ContentAlignment.MiddleLeft;
             //
             // _oauthCredentialsSection
@@ -381,7 +381,7 @@
             _oauthInfoLabel.Name = "_oauthInfoLabel";
             _oauthInfoLabel.Size = new Size(544, 45);
             _oauthInfoLabel.TabIndex = 2;
-            _oauthInfoLabel.Text = "Получите Client ID и Client Secret на https://dev.twitch.tv/console/apps. \r\nВкладка «Бот» — токен от чьего имени бот пишет в чат и слушает сообщения. \r\nВкладка «Стример» — токен владельца канала для управления опросами и информацией трансляции.";
+            _oauthInfoLabel.Text = "Получите Client ID и Client Secret на https://dev.twitch.tv/console/apps. \r\nВкладка «Бот» – токен от чьего имени бот пишет в чат и слушает сообщения. \r\nВкладка «Стример» – токен владельца канала для управления опросами и информацией трансляции.";
             //
             // OAuthSettingsControl
             //

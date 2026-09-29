@@ -1,0 +1,92 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Settings.AppearanceSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels"
+             xmlns:keepshell="clr-namespace:KeepShell.Bootstrap;assembly=KeepShell"
+             xmlns:bootstrap="clr-namespace:PoproshaykaBot.Wpf.Bootstrap"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SettingsPageViewModel}"
+             d:DesignHeight="240"
+             d:DesignWidth="600">
+
+    <StackPanel>
+        <TextBlock Text="Тема оформления"
+                   Style="{StaticResource Form.Label}" />
+        <Border Background="{DynamicResource Bg.SurfaceAlt}"
+                CornerRadius="{DynamicResource Radius.M}"
+                Padding="2"
+                HorizontalAlignment="Left"
+                Margin="0,6,0,0">
+            <StackPanel Orientation="Horizontal">
+                <RadioButton Style="{StaticResource RadioButton.Segment}"
+                             GroupName="AppearanceTheme"
+                             MinWidth="104"
+                             IsChecked="{Binding Theme.IsLight, Mode=OneWay}"
+                             Command="{Binding Theme.ApplyCommand}"
+                             CommandParameter="{x:Static bootstrap:AppTheme.Light}"
+                             AutomationProperties.Name="Светлая тема">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Sun}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Светлая"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource RadioButton.Segment}"
+                             GroupName="AppearanceTheme"
+                             MinWidth="104"
+                             Margin="2,0,0,0"
+                             IsChecked="{Binding Theme.IsDark, Mode=OneWay}"
+                             Command="{Binding Theme.ApplyCommand}"
+                             CommandParameter="{x:Static bootstrap:AppTheme.Dark}"
+                             AutomationProperties.Name="Тёмная тема">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Moon}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+                        <TextBlock Text="Тёмная"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+        </Border>
+        <TextBlock Style="{StaticResource Form.Hint}"
+                   Text="Применяется сразу, как и переключатель в заголовке окна." />
+
+        <Grid Margin="0,20,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="Масштаб шрифта"
+                       Style="{StaticResource Form.Label}" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding Shell.FontScale, StringFormat={}{0:P0}}"
+                       Style="{StaticResource Form.Value}" />
+        </Grid>
+        <Slider Minimum="{x:Static keepshell:FontScaleManager.MinScale}"
+                Maximum="{x:Static keepshell:FontScaleManager.MaxScale}"
+                Value="{Binding Shell.FontScale, Mode=TwoWay}"
+                TickFrequency="0.1"
+                IsSnapToTickEnabled="True"
+                AutomationProperties.Name="Масштаб шрифта"
+                Margin="0,6,0,0" />
+        <TextBlock Style="{StaticResource Form.Hint}"
+                   Text="Увеличивает размер текста по всему приложению. 100% – стандартный размер." />
+
+        <CheckBox Content="Показывать заголовок страницы"
+                  IsChecked="{Binding Shell.ShowPageHeader, Mode=TwoWay}"
+                  Margin="0,20,0,0" />
+        <TextBlock Style="{StaticResource Form.CheckHint}"
+                   Text="Плашка с названием раздела и описанием над содержимым каждой страницы." />
+    </StackPanel>
+</UserControl>

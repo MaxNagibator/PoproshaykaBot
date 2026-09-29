@@ -2,7 +2,7 @@
 
 namespace PoproshaykaBot.Core.Streaming;
 
-internal readonly record struct StatusTransition(bool Transitioned, StreamStatus Previous);
+internal readonly record struct StatusTransition(bool Transitioned, StreamStatus Previous, bool SnapshotChanged);
 
 internal enum OfflineProbeAction
 {
@@ -61,19 +61,33 @@ internal sealed class StreamStateMachine
         {
             _firstOfflineFromApiUtc = null;
             var previous = _status;
+            var previousStream = _stream;
             _status = StreamStatus.Online;
             _stream = ApplyOverlayLocked(stream);
-            return new(previous != StreamStatus.Online, previous);
+            return new(previous != StreamStatus.Online, previous, !StreamInfoMapper.SameSnapshot(previousStream, _stream));
         }
     }
 
-    public StatusTransition MarkOnline()
+    public StatusTransition MarkOnline(string? streamId, DateTime startedAt)
     {
         lock (_lock)
         {
             var previous = _status;
+            var previousStream = _stream;
             _status = StreamStatus.Online;
-            return new(previous != StreamStatus.Online, previous);
+
+            if (!string.IsNullOrEmpty(streamId)
+                && startedAt != default
+                && !string.Equals(_stream?.Id, streamId, StringComparison.Ordinal))
+            {
+                _stream = ApplyOverlayLocked(new()
+                {
+                    Id = streamId,
+                    StartedAt = DateTime.SpecifyKind(startedAt, DateTimeKind.Utc),
+                });
+            }
+
+            return new(previous != StreamStatus.Online, previous, !StreamInfoMapper.SameSnapshot(previousStream, _stream));
         }
     }
 
@@ -82,10 +96,11 @@ internal sealed class StreamStateMachine
         lock (_lock)
         {
             var previous = _status;
+            var hadStream = _stream != null;
             _status = StreamStatus.Offline;
             _stream = null;
             _firstOfflineFromApiUtc = null;
-            return new(previous != StreamStatus.Offline, previous);
+            return new(previous != StreamStatus.Offline, previous, hadStream);
         }
     }
 

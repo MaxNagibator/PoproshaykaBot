@@ -15,7 +15,7 @@ public sealed class PeakStreamCommand(StreamSessionHistoryStore historyStore) : 
 
     public Task<OutgoingMessage?> ExecuteAsync(CommandContext context, CancellationToken cancellationToken)
     {
-        var sessions = historyStore.Load().Sessions;
+        var sessions = historyStore.LoadVisible().Sessions;
 
         if (sessions.Count == 0)
         {
@@ -36,7 +36,7 @@ public sealed class PeakStreamCommand(StreamSessionHistoryStore historyStore) : 
         var game = string.IsNullOrWhiteSpace(record.Game) ? "Без категории" : record.Game;
         var when = FormattingUtils.FormatDateTime(record.StartedAt.UtcDateTime);
 
-        var text = $"🏆 Рекорд: 👥 {record.PeakViewers} — {title} | {game} | {when}";
+        var text = $"🏆 Рекорд: 👥 {record.PeakViewers} – {title} | {game} | {when}";
         return Task.FromResult<OutgoingMessage?>(OutgoingMessage.Reply(text, context.MessageId));
     }
 }

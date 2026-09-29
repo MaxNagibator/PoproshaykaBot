@@ -48,7 +48,7 @@ public sealed class StreamEpisodeNumberer :
     {
         if (@event.IsCatchUp)
         {
-            _logger.LogDebug("StreamEpisodeNumberer: пропуск — catch-up Online");
+            _logger.LogDebug("StreamEpisodeNumberer: пропуск – catch-up Online");
             return;
         }
 
@@ -72,7 +72,7 @@ public sealed class StreamEpisodeNumberer :
 
         if (profile.LastApplyAt is null)
         {
-            _logger.LogDebug("StreamEpisodeNumberer: пропуск — профиль ни разу не применялся вручную");
+            _logger.LogDebug("StreamEpisodeNumberer: пропуск – профиль ни разу не применялся вручную");
             return;
         }
 
@@ -80,7 +80,7 @@ public sealed class StreamEpisodeNumberer :
 
         if (now - profile.LastApplyAt.Value < RecentApplyWindow)
         {
-            _logger.LogDebug("StreamEpisodeNumberer: пропуск — недавний Apply ({Span})", now - profile.LastApplyAt.Value);
+            _logger.LogDebug("StreamEpisodeNumberer: пропуск – недавний Apply ({Span})", now - profile.LastApplyAt.Value);
             return;
         }
 
@@ -92,7 +92,7 @@ public sealed class StreamEpisodeNumberer :
 
         if (lastOffline is { } off && now - off < FlapCooldown)
         {
-            _logger.LogDebug("StreamEpisodeNumberer: пропуск — флап стрима ({Span})", now - off);
+            _logger.LogDebug("StreamEpisodeNumberer: пропуск – флап стрима ({Span})", now - off);
             return;
         }
 

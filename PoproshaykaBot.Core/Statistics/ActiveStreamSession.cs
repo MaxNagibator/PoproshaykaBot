@@ -4,6 +4,8 @@ public sealed class ActiveStreamSession
 {
     public string Channel { get; set; } = string.Empty;
 
+    public string? StreamId { get; set; }
+
     public DateTimeOffset StartedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
@@ -23,4 +25,6 @@ public sealed class ActiveStreamSession
     public List<ActiveStreamSessionChatter> Chatters { get; set; } = [];
 
     public List<ActiveStreamSessionSegment> Segments { get; set; } = [];
+
+    public List<ActiveStreamSessionInterval>? TrackedIntervals { get; set; }
 }

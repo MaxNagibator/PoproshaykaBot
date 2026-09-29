@@ -53,7 +53,7 @@ partial class HttpServerCheckPage
         _intro.Text =
             "Перед авторизацией нужно убедиться, что порт из Redirect URI свободен."
             + Environment.NewLine
-            + "Если порт уже использует HTTP сервер бота — пропустим проверку. Если занят сторонним приложением — закройте его или измените URI.";
+            + "Если порт уже использует HTTP сервер бота – пропустим проверку. Если занят сторонним приложением – закройте его или измените URI.";
         _intro.TextAlign = ContentAlignment.MiddleLeft;
         //
         // _statusLabel

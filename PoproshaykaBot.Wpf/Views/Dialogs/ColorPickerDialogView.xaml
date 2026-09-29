@@ -1,0 +1,135 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Dialogs.ColorPickerDialogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Dialogs"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ColorPickerDialogViewModel}"
+             MinWidth="420"
+             MaxWidth="520">
+    <StackPanel Margin="24">
+        <TextBlock Text="{Binding Title}"
+                   Style="{StaticResource TextBlock.Heading}"
+                   Margin="0,0,0,16" />
+
+        <Border Height="56"
+                CornerRadius="{DynamicResource Radius.M}"
+                BorderBrush="{DynamicResource Border.Default}"
+                BorderThickness="1"
+                Margin="0,0,0,16">
+            <Border.Background>
+                <SolidColorBrush Color="{Binding PreviewColor}" />
+            </Border.Background>
+        </Border>
+
+        <Grid Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="40" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="A"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       VerticalAlignment="Center" />
+            <Slider Grid.Column="1"
+                    Minimum="0"
+                    Maximum="255"
+                    Value="{Binding Alpha, Mode=TwoWay}"
+                    VerticalAlignment="Center"
+                    Margin="8,0" />
+            <TextBlock Grid.Column="2"
+                       Text="{Binding Alpha}"
+                       Style="{StaticResource TextBlock.Mono}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center" />
+        </Grid>
+
+        <Grid Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="40" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="R"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       VerticalAlignment="Center" />
+            <Slider Grid.Column="1"
+                    Minimum="0"
+                    Maximum="255"
+                    Value="{Binding Red, Mode=TwoWay}"
+                    VerticalAlignment="Center"
+                    Margin="8,0" />
+            <TextBlock Grid.Column="2"
+                       Text="{Binding Red}"
+                       Style="{StaticResource TextBlock.Mono}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center" />
+        </Grid>
+
+        <Grid Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="40" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="G"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       VerticalAlignment="Center" />
+            <Slider Grid.Column="1"
+                    Minimum="0"
+                    Maximum="255"
+                    Value="{Binding Green, Mode=TwoWay}"
+                    VerticalAlignment="Center"
+                    Margin="8,0" />
+            <TextBlock Grid.Column="2"
+                       Text="{Binding Green}"
+                       Style="{StaticResource TextBlock.Mono}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center" />
+        </Grid>
+
+        <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="40" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="B"
+                       Foreground="{DynamicResource Fg.Muted}"
+                       VerticalAlignment="Center" />
+            <Slider Grid.Column="1"
+                    Minimum="0"
+                    Maximum="255"
+                    Value="{Binding Blue, Mode=TwoWay}"
+                    VerticalAlignment="Center"
+                    Margin="8,0" />
+            <TextBlock Grid.Column="2"
+                       Text="{Binding Blue}"
+                       Style="{StaticResource TextBlock.Mono}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center" />
+        </Grid>
+
+        <TextBox Style="{StaticResource TextBox.Form}"
+                 Text="{Binding HexText, UpdateSourceTrigger=PropertyChanged}"
+                 Margin="0,0,0,20" />
+
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Отмена"
+                    Style="{StaticResource Button.Ghost}"
+                    Command="{Binding CancelCommand}"
+                    Margin="0,0,8,0"
+                    MinWidth="96" />
+            <Button Content="ОК"
+                    Style="{StaticResource Button.Primary}"
+                    Command="{Binding ConfirmCommand}"
+                    MinWidth="120" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

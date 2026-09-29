@@ -1,0 +1,164 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels">
+
+    <Style TargetType="ListBox"
+           BasedOn="{StaticResource {x:Type ListBox}}">
+        <Setter Property="VirtualizingPanel.ScrollUnit"
+                Value="Pixel" />
+    </Style>
+
+    <Style x:Key="MonoCell"
+           TargetType="TextBlock">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Mono}" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="TextWrapping"
+                Value="NoWrap" />
+        <Setter Property="Margin"
+                Value="0,0,10,0" />
+    </Style>
+
+    <Style x:Key="RightCell"
+           TargetType="TextBlock">
+        <Setter Property="HorizontalAlignment"
+                Value="Right" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="TextWrapping"
+                Value="NoWrap" />
+        <Setter Property="Margin"
+                Value="0,0,8,0" />
+    </Style>
+
+    <Style x:Key="NumericCell"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource RightCell}">
+        <Setter Property="FontFamily"
+                Value="{DynamicResource Font.Mono}" />
+    </Style>
+
+    <Style x:Key="EllipsisCell"
+           TargetType="TextBlock">
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="TextWrapping"
+                Value="NoWrap" />
+        <Setter Property="TextTrimming"
+                Value="CharacterEllipsis" />
+        <Setter Property="ToolTip"
+                Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
+    </Style>
+
+    <Style x:Key="TableListRow"
+           TargetType="ListBoxItem"
+           BasedOn="{StaticResource {x:Type ListBoxItem}}">
+        <Setter Property="HorizontalContentAlignment"
+                Value="Stretch" />
+        <Setter Property="VerticalContentAlignment"
+                Value="Center" />
+        <Setter Property="Padding"
+                Value="12,0" />
+        <Setter Property="Margin"
+                Value="0" />
+        <Setter Property="MinHeight"
+                Value="34" />
+        <Setter Property="Background"
+                Value="Transparent" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{DynamicResource Border.Subtle}"
+                            BorderThickness="0,0,0,1"
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+
+                            <Border x:Name="Outline"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="1"
+                                    IsHitTestVisible="False" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="Bd"
+                                    Property="Background"
+                                    Value="{DynamicResource Bg.SurfaceMute}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected"
+                                 Value="True">
+                            <Setter TargetName="Bd"
+                                    Property="Background"
+                                    Value="{DynamicResource Accent.Soft}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocusWithin"
+                                 Value="True">
+                            <Setter TargetName="Outline"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource Accent.Primary}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TableSortButton"
+           TargetType="Button"
+           BasedOn="{StaticResource Button.Ghost}">
+        <Setter Property="MinHeight"
+                Value="26" />
+        <Setter Property="FontSize"
+                Value="{DynamicResource Font.Size.Caption}" />
+        <Setter Property="FontWeight"
+                Value="Normal" />
+        <Setter Property="Foreground"
+                Value="{DynamicResource Fg.Secondary}" />
+        <Setter Property="Padding"
+                Value="8,2" />
+    </Style>
+
+    <Style x:Key="TableSortArrow"
+           TargetType="Path">
+        <Setter Property="Width"
+                Value="8" />
+        <Setter Property="Height"
+                Value="6" />
+        <Setter Property="Margin"
+                Value="6,1,0,0" />
+        <Setter Property="Stretch"
+                Value="Fill" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="Fill"
+                Value="{DynamicResource Accent.Primary}" />
+        <Setter Property="Visibility"
+                Value="Hidden" />
+        <Setter Property="Data"
+                Value="M 0 0 L 8 0 L 4 6 Z" />
+        <Style.Triggers>
+            <Trigger Property="Tag"
+                     Value="{x:Static vm:TableSortIndicator.Ascending}">
+                <Setter Property="Visibility"
+                        Value="Visible" />
+                <Setter Property="Data"
+                        Value="M 0 6 L 8 6 L 4 0 Z" />
+            </Trigger>
+            <Trigger Property="Tag"
+                     Value="{x:Static vm:TableSortIndicator.Descending}">
+                <Setter Property="Visibility"
+                        Value="Visible" />
+                <Setter Property="Data"
+                        Value="M 0 0 L 8 0 L 4 6 Z" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+</ResourceDictionary>

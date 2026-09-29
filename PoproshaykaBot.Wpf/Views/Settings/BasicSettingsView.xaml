@@ -1,0 +1,68 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Settings.BasicSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Settings"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:BasicSettingsSectionViewModel}"
+             d:DesignHeight="320"
+             d:DesignWidth="600">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/PoproshaykaBot.Wpf;component/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="Канал"
+                       Style="{StaticResource Setting.RowLabel}" />
+            <StackPanel Orientation="Horizontal">
+                <TextBox Style="{StaticResource TextBox.Form}"
+                         Width="{DynamicResource Setting.ShortFieldWidth}"
+                         AutomationProperties.Name="Канал Twitch"
+                         Text="{Binding Channel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         keepshell:PlaceholderBehavior.Placeholder="{Binding ChannelPlaceholder}" />
+                <Button Content="Сброс"
+                        Style="{StaticResource Button.Ghost}"
+                        Command="{Binding ResetChannelCommand}"
+                        VerticalAlignment="Center"
+                        Margin="8,0,0,0" />
+            </StackPanel>
+        </DockPanel>
+
+        <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="Аккаунт отображения"
+                       Style="{StaticResource Setting.RowLabel}" />
+            <ComboBox Style="{StaticResource ComboBox.Form}"
+                      AutomationProperties.Name="Аккаунт для отображения чата"
+                      ItemsSource="{Binding ChatAccountOptions}"
+                      DisplayMemberPath="Display"
+                      SelectedValuePath="Role"
+                      SelectedValue="{Binding ChatDisplayAccount, Mode=TwoWay}"
+                      Width="{DynamicResource Setting.ShortFieldWidth}"
+                      HorizontalAlignment="Left" />
+        </DockPanel>
+
+        <DockPanel LastChildFill="True"
+                   Margin="0,8,0,0">
+            <iconPacks:PackIconLucide DockPanel.Dock="Left"
+                                      Kind="{x:Static iconPacks:PackIconLucideKind.Info}"
+                                      Width="14"
+                                      Height="14"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,6,0"
+                                      Foreground="{DynamicResource Fg.Muted}" />
+            <TextBlock Text="Канал – название канала Twitch, к чату которого подключается бот. Аккаунт отображения определяет, от чьего имени бот показывает сообщения в оверлее."
+                       Style="{StaticResource TextBlock.Subtle}"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource Fg.Muted}" />
+        </DockPanel>
+    </StackPanel>
+</UserControl>

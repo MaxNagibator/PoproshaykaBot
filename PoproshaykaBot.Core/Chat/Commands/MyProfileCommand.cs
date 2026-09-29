@@ -6,7 +6,7 @@ namespace PoproshaykaBot.Core.Chat.Commands;
 public sealed class MyProfileCommand(IUserStatisticsRepository statistics, UserRankService rankService) : IChatCommand
 {
     public string Canonical => "мойпрофиль";
-    public IReadOnlyCollection<string> Aliases => ["profile"];
+    public IReadOnlyCollection<string> Aliases => ["profile", "профиль"];
     public string Description => "твоя статистика";
 
     public bool CanExecute(CommandContext context)

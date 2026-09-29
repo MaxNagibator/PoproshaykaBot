@@ -1,0 +1,626 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.CommandsPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels"
+             xmlns:controls="clr-namespace:KeepShell.Views.Controls;assembly=KeepShell"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:CommandsPageViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="1024">
+
+    <UserControl.Resources>
+
+        <Style x:Key="CommandRowItem"
+               TargetType="ListBoxItem"
+               BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch" />
+            <Setter Property="VerticalContentAlignment"
+                    Value="Center" />
+            <Setter Property="Padding"
+                    Value="12,4" />
+            <Setter Property="Margin"
+                    Value="0" />
+            <Setter Property="MinHeight"
+                    Value="44" />
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding Summary}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="0,0,0,1"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                  VerticalAlignment="Center" />
+
+                                <Border x:Name="Outline"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="1"
+                                        IsHitTestVisible="False" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource Bg.SurfaceMute}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected"
+                                     Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource Accent.Soft}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin"
+                                     Value="True">
+                                <Setter TargetName="Outline"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Accent.Primary}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CommandColumnHeader"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource RatingHeaderText}">
+            <Setter Property="TextWrapping"
+                    Value="NoWrap" />
+        </Style>
+
+        <Style x:Key="InspectorSectionHeader"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource Font.Weight.SemiBold}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Secondary}" />
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
+            <Setter Property="Margin"
+                    Value="0,16,0,6" />
+        </Style>
+
+        <DataTemplate x:Key="CommandRowTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"
+                                      MinWidth="110" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="CommandAccess" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="CommandTotal" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="CommandLastUse" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0"
+                            Margin="0,0,12,0"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Invocation}"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Description}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Fg.Primary}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEnabled}"
+                                                 Value="False">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource Fg.Secondary}" />
+                                        <Setter Property="TextDecorations"
+                                                Value="Strikethrough" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <TextBlock Text="{Binding AliasesText}"
+                               FontFamily="{DynamicResource Font.Mono}"
+                               FontSize="{DynamicResource Font.Size.Caption}"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding AliasesText}"
+                               Visibility="{Binding HasAliases, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+
+                <TextBlock Grid.Column="1"
+                           Margin="0,0,12,0"
+                           VerticalAlignment="Center"
+                           Text="{Binding AccessText}"
+                           Foreground="{DynamicResource Fg.Secondary}"
+                           FontSize="{DynamicResource Font.Size.Caption}"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding AccessHint}" />
+
+                <TextBlock Grid.Column="2"
+                           Style="{StaticResource RatingNumber}"
+                           Margin="0,0,16,0"
+                           Text="{Binding TotalCountText}" />
+
+                <StackPanel Grid.Column="3"
+                            MinWidth="92"
+                            VerticalAlignment="Center"
+                            ToolTip="{Binding LastUsedTooltip}">
+                    <TextBlock Text="{Binding LastUsedAtText}"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Fg.Primary}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasLastUse}"
+                                                 Value="False">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource Fg.Muted}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <TextBlock Text="{Binding LastUsedByText}"
+                               FontSize="{DynamicResource Font.Size.Caption}"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding HasLastUse, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="CommandParameterTemplate"
+                      DataType="{x:Type vm:CommandParameterViewModel}">
+            <StackPanel Margin="0,0,0,12">
+                <TextBlock Text="{Binding Label}"
+                           FontSize="{DynamicResource Font.Size.Caption}"
+                           FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                           Foreground="{DynamicResource Fg.Primary}"
+                           TextWrapping="Wrap" />
+
+                <TextBlock Text="{Binding Hint}"
+                           Style="{StaticResource StatLabel}"
+                           Margin="0,2,0,0"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
+
+                <TextBox Margin="0,6,0,0"
+                         Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="{Binding Label}"
+                         AutomationProperties.HelpText="{Binding Hint}">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox"
+                               BasedOn="{StaticResource TextBox.Form}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMultiline}"
+                                             Value="True">
+                                    <Setter Property="AcceptsReturn"
+                                            Value="True" />
+                                    <Setter Property="TextWrapping"
+                                            Value="Wrap" />
+                                    <Setter Property="MinHeight"
+                                            Value="72" />
+                                    <Setter Property="VerticalScrollBarVisibility"
+                                            Value="Auto" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasError}"
+                                             Value="True">
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource State.ErrorText}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+
+                <TextBlock Text="{Binding Error}"
+                           Margin="0,4,0,0"
+                           FontSize="{DynamicResource Font.Size.Caption}"
+                           Foreground="{DynamicResource State.ErrorText}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding Error, Converter={StaticResource NullToVisibility}}" />
+            </StackPanel>
+        </DataTemplate>
+
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"
+                                  MinWidth="150"
+                                  MaxWidth="360" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <TextBox Style="{StaticResource TextBox.IconField}"
+                         Padding="10,0,32,0"
+                         Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="Поиск команды по имени или описанию" />
+
+                <TextBlock Text="Найти команду"
+                           Margin="43,0,38,0"
+                           VerticalAlignment="Center"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource Fg.Muted}"
+                           IsHitTestVisible="False"
+                           Visibility="{Binding FilterText, Converter={StaticResource NullToVisibility}, ConverterParameter=Inverse}" />
+
+                <Button HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,2,0"
+                        Style="{StaticResource Button.Icon}"
+                        Command="{Binding ClearFilterCommand}"
+                        AutomationProperties.Name="Очистить поиск"
+                        ToolTip="Очистить поиск"
+                        Visibility="{Binding IsFilterActive, Converter={StaticResource BoolToVisibility}}">
+                    <iconPacks:PackIconLucide Kind="X"
+                                              Width="14"
+                                              Height="14" />
+                </Button>
+            </Grid>
+
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal">
+                <TextBlock Text="Ответ по умолчанию"
+                           VerticalAlignment="Center"
+                           Margin="16,0,8,0"
+                           Foreground="{DynamicResource Fg.Secondary}" />
+
+                <ComboBox MinWidth="170"
+                          VerticalAlignment="Center"
+                          Style="{StaticResource ComboBox.Toolbar}"
+                          ItemsSource="{Binding DefaultTargetOptions}"
+                          SelectedItem="{Binding DefaultTargetOption, Mode=TwoWay}"
+                          DisplayMemberPath="Title"
+                          AutomationProperties.Name="Цель ответа по умолчанию для всех команд"
+                          ToolTip="Куда уходит ответ команды, у которой не выбрана своя цель" />
+
+                <Button Style="{StaticResource Button.Icon}"
+                        Margin="8,0,0,0"
+                        Command="{Binding RefreshCommand}"
+                        AutomationProperties.Name="Перечитать настройки и счётчики команд"
+                        ToolTip="Перечитать настройки и счётчики команд">
+                    <iconPacks:PackIconLucide Kind="RefreshCw"
+                                              Width="14"
+                                              Height="14" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="1">
+            <Border Margin="0,0,0,12"
+                    Padding="12,8"
+                    CornerRadius="{DynamicResource Radius.M}"
+                    Background="{DynamicResource State.ErrorSoft}"
+                    Visibility="{Binding Notice, Converter={StaticResource NullToVisibility}}"
+                    AutomationProperties.LiveSetting="Assertive">
+                <TextBlock x:Name="NoticeText"
+                           Text="{Binding Notice}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource State.ErrorText}" />
+            </Border>
+
+            <Border Margin="0,0,0,12"
+                    Padding="12,8"
+                    CornerRadius="{DynamicResource Radius.M}"
+                    Background="{DynamicResource State.WarningSoft}"
+                    Visibility="{Binding WhisperNotice, Converter={StaticResource NullToVisibility}}">
+                <TextBlock Text="{Binding WhisperNotice}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource State.WarningText}" />
+            </Border>
+        </StackPanel>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="2*"
+                                  MinWidth="300"
+                                  MaxWidth="380" />
+            </Grid.ColumnDefinitions>
+
+            <controls:EmptyState Grid.Column="0"
+                                 Grid.ColumnSpan="2"
+                                 Icon="Terminal"
+                                 Heading="{Binding EmptyHeading}"
+                                 Description="{Binding EmptyDescription}"
+                                 DescriptionMaxWidth="320"
+                                 ActionText="{Binding EmptyActionText}"
+                                 ActionCommand="{Binding EmptyActionCommand}"
+                                 Visibility="{Binding HasCommands, Converter={StaticResource InverseBoolToVisibility}}" />
+
+            <Border Grid.Column="0"
+                    Style="{StaticResource Card}"
+                    Padding="0"
+                    Margin="0,0,16,0"
+                    Visibility="{Binding HasCommands, Converter={StaticResource BoolToVisibility}}">
+                <Grid Grid.IsSharedSizeScope="True">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0"
+                                Margin="16,12,16,10">
+                        <TextBlock Style="{StaticResource StatLabel}"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding SummaryLine}" />
+
+                        <TextBlock Style="{StaticResource StatLabel}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding UsageHint}"
+                                   Visibility="{Binding HasUsage, Converter={StaticResource InverseBoolToVisibility}}" />
+                    </StackPanel>
+
+                    <Border Grid.Row="1"
+                            Height="1"
+                            Background="{DynamicResource Border.Subtle}" />
+
+                    <ScrollViewer x:Name="TableScroll"
+                                  Grid.Row="2"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled"
+                                  Focusable="False">
+                        <Grid MinWidth="{Binding ViewportWidth, ElementName=TableScroll}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0"
+                                  Margin="12,6,24,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"
+                                                      MinWidth="110" />
+                                    <ColumnDefinition Width="Auto"
+                                                      SharedSizeGroup="CommandAccess" />
+                                    <ColumnDefinition Width="Auto"
+                                                      SharedSizeGroup="CommandTotal" />
+                                    <ColumnDefinition Width="Auto"
+                                                      SharedSizeGroup="CommandLastUse" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Style="{StaticResource CommandColumnHeader}"
+                                           Margin="0,0,12,0"
+                                           Text="Команда" />
+
+                                <TextBlock Grid.Column="1"
+                                           Style="{StaticResource CommandColumnHeader}"
+                                           Margin="0,0,12,0"
+                                           Text="Права" />
+
+                                <TextBlock Grid.Column="2"
+                                           Style="{StaticResource CommandColumnHeader}"
+                                           Margin="0,0,16,0"
+                                           HorizontalAlignment="Right"
+                                           Text="Всего" />
+
+                                <TextBlock Grid.Column="3"
+                                           Style="{StaticResource CommandColumnHeader}"
+                                           Text="Последний вызов" />
+                            </Grid>
+
+                            <ListBox x:Name="CommandList"
+                                     Grid.Row="1"
+                                     ItemsSource="{Binding Rows}"
+                                     SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                                     AutomationProperties.Name="Список команд чата"
+                                     ItemContainerStyle="{StaticResource CommandRowItem}"
+                                     ItemTemplate="{StaticResource CommandRowTemplate}"
+                                     SelectionMode="Single"
+                                     HorizontalContentAlignment="Stretch"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="0"
+                                     ScrollViewer.CanContentScroll="False"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Visible" />
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Style="{StaticResource Card}"
+                    Padding="16"
+                    Visibility="{Binding HasCommands, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Visibility="{Binding HasSelectedRow, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedRow.Invocation}"
+                                       FontFamily="{DynamicResource Font.Mono}"
+                                       FontSize="{DynamicResource Font.Size.XL}"
+                                       FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                       Foreground="{DynamicResource Fg.Primary}"
+                                       TextWrapping="Wrap"
+                                       AutomationProperties.Name="Выделенная команда" />
+
+                            <TextBlock Text="{Binding SelectedRow.AliasesText}"
+                                       FontFamily="{DynamicResource Font.Mono}"
+                                       FontSize="{DynamicResource Font.Size.Caption}"
+                                       Foreground="{DynamicResource Fg.Muted}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0"
+                                       Visibility="{Binding SelectedRow.HasAliases, Converter={StaticResource BoolToVisibility}}" />
+
+                            <TextBlock Text="{Binding SelectedRow.Description}"
+                                       Foreground="{DynamicResource Fg.Secondary}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,0"
+                                       AutomationProperties.Name="Описание выделенной команды" />
+
+                            <CheckBox Margin="0,16,0,0"
+                                      Style="{StaticResource CheckBox.Default}"
+                                      Content="Команда включена"
+                                      IsChecked="{Binding SelectedRow.IsEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="{Binding SelectedRow.EnabledAutomationName}" />
+
+                            <TextBlock Style="{StaticResource InspectorSectionHeader}"
+                                       Text="Права" />
+
+                            <ComboBox Style="{StaticResource ComboBox.Form}"
+                                      ItemsSource="{Binding AccessOptions}"
+                                      SelectedItem="{Binding SelectedRow.AccessOption, Mode=TwoWay}"
+                                      DisplayMemberPath="Title"
+                                      AutomationProperties.Name="{Binding SelectedRow.AccessAutomationName}"
+                                      ToolTip="{Binding SelectedRow.AccessOption.Hint}" />
+
+                            <TextBlock Style="{StaticResource StatLabel}"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap">
+                                <Run Text="В коде команды:" />
+                                <Run Text="{Binding SelectedRow.CodeAccessText, Mode=OneWay}" />
+                                <Run Text="·" />
+                                <Run Text="сейчас:" />
+                                <Run Text="{Binding SelectedRow.AccessText, Mode=OneWay}" />
+                            </TextBlock>
+
+                            <TextBlock Text="{Binding SelectedRow.AccessHint}"
+                                       Style="{StaticResource StatLabel}"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap" />
+
+                            <Border Margin="0,8,0,0"
+                                    Padding="10,6"
+                                    CornerRadius="{DynamicResource Radius.M}"
+                                    Background="{DynamicResource State.WarningSoft}"
+                                    Visibility="{Binding SelectedRow.AccessConflictNote, Converter={StaticResource NullToVisibility}}">
+                                <TextBlock Text="{Binding SelectedRow.AccessConflictNote}"
+                                           FontSize="{DynamicResource Font.Size.Caption}"
+                                           Foreground="{DynamicResource State.WarningText}"
+                                           TextWrapping="Wrap" />
+                            </Border>
+
+                            <TextBlock Style="{StaticResource InspectorSectionHeader}"
+                                       Text="Цель ответа" />
+
+                            <ComboBox Style="{StaticResource ComboBox.Form}"
+                                      ItemsSource="{Binding CommandTargetOptions}"
+                                      SelectedItem="{Binding SelectedRow.TargetOption, Mode=TwoWay}"
+                                      DisplayMemberPath="Title"
+                                      AutomationProperties.Name="{Binding SelectedRow.TargetAutomationName}"
+                                      ToolTip="{Binding SelectedRow.TargetTooltip}" />
+
+                            <TextBlock Text="{Binding SelectedRow.TargetSummary}"
+                                       Style="{StaticResource StatLabel}"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap" />
+
+                            <StackPanel Visibility="{Binding HasParameters, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Style="{StaticResource InspectorSectionHeader}"
+                                           Text="{Binding Parameters.Heading}" />
+
+                                <ItemsControl ItemsSource="{Binding Parameters.Items}"
+                                              ItemTemplate="{StaticResource CommandParameterTemplate}" />
+
+                                <Button Content="Сохранить параметры"
+                                        Style="{StaticResource Button.Primary}"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Center"
+                                        Command="{Binding SaveParametersCommand}"
+                                        AutomationProperties.Name="Сохранить параметры выделенной команды" />
+
+                                <TextBlock Margin="0,6,0,0"
+                                           Text="{Binding ParametersNotice}"
+                                           FontSize="{DynamicResource Font.Size.Caption}"
+                                           TextWrapping="Wrap"
+                                           AutomationProperties.LiveSetting="Polite"
+                                           Visibility="{Binding ParametersNotice, Converter={StaticResource NullToVisibility}}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource Fg.Secondary}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ParametersNoticeTone}"
+                                                             Value="Warning">
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource State.WarningText}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ParametersNoticeTone}"
+                                                             Value="Error">
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource State.ErrorText}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <TextBlock Style="{StaticResource InspectorSectionHeader}"
+                                       Text="Вызовы" />
+
+                            <UniformGrid Columns="2">
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Style="{StaticResource StatValue.Small}"
+                                               Text="{Binding SelectedRow.TotalCountText}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="всего" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Style="{StaticResource StatValue.Small}"
+                                               Text="{Binding SelectedRow.StreamCountText}" />
+                                    <TextBlock Style="{StaticResource StatLabel}"
+                                               Text="за текущий стрим" />
+                                </StackPanel>
+                            </UniformGrid>
+
+                            <TextBlock Text="{Binding SelectedRow.LastUsedTooltip}"
+                                       Style="{StaticResource StatLabel}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <StackPanel VerticalAlignment="Center"
+                                Visibility="{Binding HasSelectedRow, Converter={StaticResource InverseBoolToVisibility}}">
+                        <iconPacks:PackIconLucide Kind="MousePointerClick"
+                                                  Width="20"
+                                                  Height="20"
+                                                  HorizontalAlignment="Center"
+                                                  Foreground="{DynamicResource Fg.Muted}" />
+                        <TextBlock Text="Выберите команду в списке"
+                                   Style="{StaticResource TextBlock.Subtle}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

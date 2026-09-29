@@ -71,6 +71,27 @@ public class OnboardingWizardSmokeTests
             cf.ByControlType(ControlType.Text).And(cf.ByName("Шаг 1 из 8")));
 
         Assert.That(stepLabel, Is.Not.Null,
-            "Мастер должен открываться на первом шаге из 8 — текст 'Шаг 1 из 8' должен быть в окне");
+            "Мастер должен открываться на первом шаге из 8 – текст 'Шаг 1 из 8' должен быть в окне");
+    }
+
+    [Test]
+    public void Wizard_ShouldOpenOffScreen()
+    {
+        var wizard = _session!.FindTopLevelWindow(w => string.Equals(w.Title, WizardTitle, StringComparison.Ordinal),
+            WizardAppearTimeout);
+
+        Assert.That(wizard, Is.Not.Null, "Мастер должен быть найден перед проверкой координат");
+
+        var bounds = wizard!.BoundingRectangle;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bounds.Width, Is.GreaterThan(0), "Ширина мастера должна быть положительной, иначе проверка координат ничего не значит");
+            Assert.That(bounds.Height, Is.GreaterThan(0), "Высота мастера должна быть положительной, иначе проверка координат ничего не значит");
+            Assert.That(bounds.Right, Is.LessThanOrEqualTo(0),
+                "Под --ui-smoke мастер должен целиком уходить левее начала координат, а не вставать поверх работы пользователя");
+            Assert.That(bounds.Bottom, Is.LessThanOrEqualTo(0),
+                "Под --ui-smoke мастер должен целиком уходить выше начала координат, а не вставать поверх работы пользователя");
+        }
     }
 }

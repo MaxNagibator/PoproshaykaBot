@@ -1,0 +1,149 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Tiles.PollsTileView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Tiles"
+             xmlns:behaviors="clr-namespace:PoproshaykaBot.Wpf.Infrastructure.Behaviors"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:PollsTileViewModel}"
+             d:DesignHeight="300"
+             d:DesignWidth="380">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="{Binding UnsavedNotice}"
+                   FontSize="{DynamicResource Font.Size.S}"
+                   Foreground="{DynamicResource State.WarningText}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,8"
+                   AutomationProperties.LiveSetting="Polite"
+                   Visibility="{Binding UnsavedNotice, Converter={StaticResource NullToVisibility}}" />
+
+        <StackPanel Grid.Row="1">
+
+            <TextBlock Text="Активного опроса нет – создайте кнопкой в заголовке"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       FontSize="{DynamicResource Font.Size.S}"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding HasSnapshot, Converter={StaticResource InverseBoolToVisibility}}" />
+
+            <StackPanel Margin="0,4,0,0"
+                        Visibility="{Binding HasSnapshot, Converter={StaticResource BoolToVisibility}}">
+
+                <TextBlock Text="{Binding CurrentSnapshot.Title}"
+                           FontSize="{DynamicResource Font.Size.M}"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource Fg.Primary}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10" />
+
+                <ItemsControl ItemsSource="{Binding Choices}"
+                              Margin="0,0,0,6">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:PollChoiceRowViewModel}">
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="3" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="0"
+                                           Text="{Binding Title}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource Fg.Primary}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="FontWeight"
+                                                    Value="Normal" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLeader}"
+                                                             Value="True">
+                                                    <Setter Property="FontWeight"
+                                                            Value="SemiBold" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="1"
+                                           Text="{Binding Label}"
+                                           Foreground="{DynamicResource Fg.Secondary}"
+                                           FontSize="{DynamicResource Font.Size.S}"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="FontWeight"
+                                                    Value="Normal" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLeader}"
+                                                             Value="True">
+                                                    <Setter Property="FontWeight"
+                                                            Value="SemiBold" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <ProgressBar Grid.Row="2"
+                                             Grid.Column="0"
+                                             Grid.ColumnSpan="2"
+                                             Value="{Binding Percent}"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Height="6" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="{Binding FooterText}"
+                           behaviors:StreamStatusBrushBehavior.Foreground="{Binding FooterStatusKey}"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,8" />
+            </StackPanel>
+
+            <TextBlock x:Name="StatusLine"
+                       Text="{Binding StatusMessage}"
+                       Foreground="{DynamicResource State.ErrorText}"
+                       FontSize="{DynamicResource Font.Size.S}"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Margin"
+                                Value="0,0,0,8" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasSnapshot}"
+                                         Value="False">
+                                <Setter Property="Margin"
+                                        Value="0,8,0,0" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <Button Content="Завершить голосование"
+                    Command="{Binding EndPollCommand}"
+                    Style="{StaticResource Button.Secondary}"
+                    Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

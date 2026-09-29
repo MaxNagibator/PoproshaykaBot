@@ -1,4 +1,5 @@
-﻿using PoproshaykaBot.WinForms.Tiles;
+﻿using PoproshaykaBot.Core.Dashboard;
+using PoproshaykaBot.WinForms.Tiles;
 
 namespace PoproshaykaBot.WinForms.Forms.Settings;
 

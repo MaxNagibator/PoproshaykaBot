@@ -1,0 +1,112 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Dialogs.PollFromProfileDialogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Dialogs"
+             xmlns:controls="clr-namespace:KeepShell.Views.Controls;assembly=KeepShell"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:PollFromProfileDialogViewModel}"
+             MinWidth="480"
+             MinHeight="320"
+             Width="640"
+             Height="400">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Выбор профиля голосования"
+                   Style="{StaticResource TextBlock.Heading}"
+                   Margin="0,0,0,12" />
+
+        <controls:EmptyState Grid.Row="1"
+                             Icon="{x:Static iconPacks:PackIconLucideKind.ListChecks}"
+                             Heading="Профилей опросов пока нет"
+                             Description="Создайте первый профиль, чтобы запускать голосования в один клик."
+                             DescriptionMaxWidth="360"
+                             ActionText="Создать профиль"
+                             ActionCommand="{Binding CreateProfileCommand}"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Center"
+                             Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+
+        <Grid Grid.Row="1"
+              Visibility="{Binding IsEmpty, Converter={StaticResource InverseBoolToVisibility}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*"
+                                  MinWidth="120" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="5*"
+                                  MinWidth="120" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox Grid.Column="0"
+                     ItemsSource="{Binding Profiles}"
+                     SelectedItem="{Binding SelectedProfile, Mode=TwoWay}"
+                     DisplayMemberPath="Name"
+                     BorderBrush="{DynamicResource Border.Default}"
+                     BorderThickness="1">
+                <ListBox.InputBindings>
+                    <MouseBinding MouseAction="LeftDoubleClick"
+                                  Command="{Binding LaunchCommand}" />
+                </ListBox.InputBindings>
+                <ListBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Редактировать…"
+                                  Command="{Binding PlacementTarget.DataContext.EditCommand,
+                                            RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Separator />
+                        <MenuItem Header="Удалить"
+                                  Command="{Binding PlacementTarget.DataContext.DeleteCommand,
+                                            RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                    </ContextMenu>
+                </ListBox.ContextMenu>
+            </ListBox>
+
+            <GridSplitter Grid.Column="1"
+                          Width="5"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="{DynamicResource Border.Subtle}"
+                          Margin="4,0" />
+
+            <ScrollViewer Grid.Column="2"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="8,0,0,0">
+                <TextBlock Text="{Binding PreviewText}"
+                           Foreground="{DynamicResource Fg.Muted}"
+                           TextWrapping="Wrap" />
+            </ScrollViewer>
+        </Grid>
+
+        <TextBlock Grid.Row="2"
+                   Text="{Binding Notice}"
+                   Foreground="{DynamicResource State.WarningText}"
+                   TextWrapping="Wrap"
+                   Margin="0,12,0,0"
+                   AutomationProperties.LiveSetting="Polite"
+                   Visibility="{Binding Notice, Converter={StaticResource NullToVisibility}}" />
+
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+            <Button Content="Отмена"
+                    Style="{StaticResource Button.Ghost}"
+                    Command="{Binding CancelCommand}"
+                    Margin="0,0,8,0"
+                    MinWidth="96" />
+            <Button Content="Запустить"
+                    Style="{StaticResource Button.Primary}"
+                    Command="{Binding LaunchCommand}"
+                    MinWidth="120" />
+        </StackPanel>
+    </Grid>
+</UserControl>

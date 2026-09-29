@@ -51,7 +51,7 @@ public partial class OAuthSettingsControl : UserControl
     {
         if (string.IsNullOrWhiteSpace(channel))
         {
-            _channelHintLabel.Text = "⚠ Канал не задан — заполните его на вкладке «Основные», иначе авторизация стримера не пройдёт.";
+            _channelHintLabel.Text = "⚠ Канал не задан – заполните его на вкладке «Основные», иначе авторизация стримера не пройдёт.";
             _channelHintLabel.ForeColor = Color.Red;
         }
         else

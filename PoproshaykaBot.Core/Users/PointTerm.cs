@@ -10,7 +10,7 @@ public sealed class PointTerm
 
     public string ForCount(long count)
     {
-        var abs = (ulong)Math.Abs(count);
+        var abs = count < 0 ? unchecked((ulong)-count) : (ulong)count;
         var mod100 = abs % 100;
         var mod10 = abs % 10;
 

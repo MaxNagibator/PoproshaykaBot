@@ -2,7 +2,9 @@
 using Microsoft.Extensions.Logging;
 using PoproshaykaBot.Core.Chat;
 using PoproshaykaBot.Core.Server;
+using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Settings;
+using PoproshaykaBot.Core.Settings.Stores;
 using PoproshaykaBot.Core.Tests.Server;
 using System.Text;
 
@@ -15,12 +17,16 @@ public sealed class SseServiceTests
     public void SetUp()
     {
         _settings = new();
-        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance);
+        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance, null, null);
 
         _settingsManager.Current.Returns(_settings);
         _logger = new();
         _registry = new();
-        _service = new(_settingsManager, _logger, new(), _registry, new());
+        _obsChatStore = new(new InMemoryEventBus(NullLogger<InMemoryEventBus>.Instance),
+            NullLogger<ObsChatStore>.Instance,
+            Path.Combine(Path.GetTempPath(), "poproshayka-sse-" + Guid.NewGuid().ToString("N"), "obs-chat.json"));
+
+        _service = new(_settingsManager, _obsChatStore, _logger, new(), _registry, new());
     }
 
     [TearDown]
@@ -34,6 +40,7 @@ public sealed class SseServiceTests
     private RecordingLogger<SseService> _logger = null!;
     private SseService _service = null!;
     private SseClientRegistry _registry = null!;
+    private ObsChatStore _obsChatStore = null!;
 
     [Test]
     public void DroppedMessageCount_FreshService_IsZero()

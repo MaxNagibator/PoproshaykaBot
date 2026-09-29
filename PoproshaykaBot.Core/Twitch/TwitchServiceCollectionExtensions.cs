@@ -25,6 +25,11 @@ public static class TwitchServiceCollectionExtensions
             })
             .AddHttpMessageHandler<BroadcasterTwitchAuthHandler>();
 
+        services.AddHttpClient(TwitchEndpoints.HelixAppClient, client =>
+        {
+            client.BaseAddress = new(TwitchEndpoints.HelixBaseUrl);
+        });
+
         services.AddKeyedSingleton<ITwitchHelixClient, BotHelixClient>(TwitchEndpoints.HelixBotClient);
         services.AddKeyedSingleton<ITwitchHelixClient, BroadcasterHelixClient>(TwitchEndpoints.HelixBroadcasterClient);
 

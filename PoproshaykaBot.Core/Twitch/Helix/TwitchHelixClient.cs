@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -7,6 +8,9 @@ namespace PoproshaykaBot.Core.Twitch.Helix;
 
 public abstract class TwitchHelixClient(IHttpClientFactory httpClientFactory, ILogger<TwitchHelixClient> logger) : ITwitchHelixClient
 {
+    public const int MaxGamesPerRequest = 100;
+    public const int MaxEventSubSubscriptionPages = 10;
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     protected abstract string HttpClientName { get; }
@@ -109,7 +113,26 @@ public abstract class TwitchHelixClient(IHttpClientFactory httpClientFactory, IL
         return dto is null ? null : new GameInfo(dto.Id, dto.Name, dto.BoxArtUrl, dto.IgdbId);
     }
 
-    public async Task SendChatMessageAsync(
+    public async Task<IReadOnlyList<GameInfo>> GetGamesByNamesAsync(IEnumerable<string> names, CancellationToken cancellationToken = default)
+    {
+        var nameList = names
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(MaxGamesPerRequest)
+            .ToArray();
+
+        if (nameList.Length == 0)
+        {
+            return [];
+        }
+
+        var query = string.Join('&', nameList.Select(name => $"name={Uri.EscapeDataString(name)}"));
+        var data = await GetCollectionAsync<HelixGameDto>($"{TwitchEndpoints.HelixGames}?{query}", cancellationToken);
+
+        return data.Select(dto => new GameInfo(dto.Id, dto.Name, dto.BoxArtUrl, dto.IgdbId)).ToArray();
+    }
+
+    public async Task<string?> SendChatMessageAsync(
         string broadcasterId,
         string senderId,
         string message,
@@ -136,6 +159,28 @@ public abstract class TwitchHelixClient(IHttpClientFactory httpClientFactory, IL
             var reason = item.DropReason?.Message ?? string.Empty;
             throw new HelixMessageDroppedException(code, reason);
         }
+
+        return item?.MessageId;
+    }
+
+    public async Task SendWhisperAsync(string fromUserId, string toUserId, string message, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fromUserId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(toUserId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+
+        var query = $"from_user_id={Uri.EscapeDataString(fromUserId)}&to_user_id={Uri.EscapeDataString(toUserId)}";
+
+        using var client = httpClientFactory.CreateClient(HttpClientName);
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{TwitchEndpoints.HelixWhispers}?{query}")
+        {
+            Content = JsonContent.Create(new HelixSendWhisperDto(message), options: JsonOptions),
+        };
+
+        httpRequest.Options.Set(TwitchAuthHandlerBase.KeepTokenOnUnauthorized, true);
+
+        using var response = await client.SendAsync(httpRequest, cancellationToken);
+        await EnsureSuccessAsync(httpRequest, response, cancellationToken);
     }
 
     public async Task<IReadOnlyDictionary<string, GlobalBadgeInfo>> GetGlobalChatBadgesAsync(CancellationToken cancellationToken = default)
@@ -198,6 +243,66 @@ public abstract class TwitchHelixClient(IHttpClientFactory httpClientFactory, IL
         return subscription.Id;
     }
 
+    public async Task<bool> DeleteEventSubSubscriptionAsync(string subscriptionId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(subscriptionId);
+
+        using var client = httpClientFactory.CreateClient(HttpClientName);
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Delete,
+            $"{TwitchEndpoints.HelixEventSubSubscriptions}?id={Uri.EscapeDataString(subscriptionId)}");
+
+        using var response = await client.SendAsync(httpRequest, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        await EnsureSuccessAsync(httpRequest, response, cancellationToken);
+
+        logger.LogInformation("Удалена EventSub подписка {Id}", subscriptionId);
+
+        return true;
+    }
+
+    public async Task<IReadOnlyList<EventSubSubscriptionInfo>> GetEventSubSubscriptionsByUserAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        var result = new List<EventSubSubscriptionInfo>();
+        string? cursor = null;
+
+        // TODO: потолок в MaxEventSubSubscriptionPages страниц по 100 подписок с одним пользователем в условии; упрётся, если на одного пользователя у клиента накопится больше тысячи подписок – тогда листать без потолка с защитой от повторяющегося курсора
+        for (var page = 0; page < MaxEventSubSubscriptionPages; page++)
+        {
+            var uri = $"{TwitchEndpoints.HelixEventSubSubscriptions}?user_id={Uri.EscapeDataString(userId)}";
+
+            if (cursor is not null)
+            {
+                uri += $"&after={Uri.EscapeDataString(cursor)}";
+            }
+
+            var envelope = await GetRawAsync<HelixEnvelope<HelixEventSubSubscriptionListItemDto>>(uri, cancellationToken);
+
+            foreach (var dto in envelope?.Data ?? [])
+            {
+                result.Add(new(dto.Id,
+                    dto.Type,
+                    dto.Status,
+                    dto.Transport?.SessionId,
+                    dto.Condition ?? new Dictionary<string, string>()));
+            }
+
+            cursor = envelope?.Pagination?.Cursor;
+
+            if (string.IsNullOrEmpty(cursor))
+            {
+                break;
+            }
+        }
+
+        return result;
+    }
+
     public async Task<HelixPollInfo> CreatePollAsync(CreatePollRequest request, CancellationToken cancellationToken = default)
     {
         var body = new HelixCreatePollDto(request.BroadcasterId,
@@ -247,16 +352,10 @@ public abstract class TwitchHelixClient(IHttpClientFactory httpClientFactory, IL
 
     public async Task<IReadOnlyList<HelixPollInfo>> GetPollsAsync(
         string broadcasterId,
-        string? status = null,
         int first = 20,
         CancellationToken cancellationToken = default)
     {
         var uri = $"{TwitchEndpoints.HelixPolls}?broadcaster_id={Uri.EscapeDataString(broadcasterId)}&first={first}";
-
-        if (!string.IsNullOrWhiteSpace(status))
-        {
-            uri += $"&status={Uri.EscapeDataString(status)}";
-        }
 
         var data = await GetCollectionAsync<HelixPollDto>(uri, cancellationToken);
         return data.Select(MapPoll).ToArray();
@@ -325,7 +424,7 @@ public abstract class TwitchHelixClient(IHttpClientFactory httpClientFactory, IL
         }
         catch (JsonException)
         {
-            // Twitch occasionally returns non-JSON error bodies — fall back to raw body
+            // Twitch occasionally returns non-JSON error bodies – fall back to raw body
         }
 
         throw new HelixRequestException(request.Method,

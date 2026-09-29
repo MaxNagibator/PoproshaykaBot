@@ -179,7 +179,7 @@ public sealed class EventSubConnectionHostTests
         await broadcasterHost.StartAsync(NullProgress, CancellationToken.None);
 
         Assert.That(_statusEvents.Select(e => e.Status), Does.Contain(StreamMonitoringStatus.Connecting),
-            "broadcaster-сессия — равноправный источник статуса; молчаливый отказ broadcaster-WS оставляет UI без сигнала и тихо ломает channel.update/channel.poll.*");
+            "broadcaster-сессия – равноправный источник статуса; молчаливый отказ broadcaster-WS оставляет UI без сигнала и тихо ломает channel.update/channel.poll.*");
     }
 
     [Test]

@@ -18,12 +18,16 @@ public interface ITwitchHelixClient
 
     Task<GameInfo?> GetGameByIdAsync(string gameId, CancellationToken cancellationToken = default);
 
-    Task SendChatMessageAsync(
+    Task<IReadOnlyList<GameInfo>> GetGamesByNamesAsync(IEnumerable<string> names, CancellationToken cancellationToken = default);
+
+    Task<string?> SendChatMessageAsync(
         string broadcasterId,
         string senderId,
         string message,
         string? replyParentMessageId = null,
         CancellationToken cancellationToken = default);
+
+    Task SendWhisperAsync(string fromUserId, string toUserId, string message, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyDictionary<string, GlobalBadgeInfo>> GetGlobalChatBadgesAsync(CancellationToken cancellationToken = default);
 
@@ -36,13 +40,16 @@ public interface ITwitchHelixClient
         string sessionId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> DeleteEventSubSubscriptionAsync(string subscriptionId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<EventSubSubscriptionInfo>> GetEventSubSubscriptionsByUserAsync(string userId, CancellationToken cancellationToken = default);
+
     Task<HelixPollInfo> CreatePollAsync(CreatePollRequest request, CancellationToken cancellationToken = default);
 
     Task<HelixPollInfo> EndPollAsync(EndPollRequest request, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<HelixPollInfo>> GetPollsAsync(
         string broadcasterId,
-        string? status = null,
         int first = 20,
         CancellationToken cancellationToken = default);
 }

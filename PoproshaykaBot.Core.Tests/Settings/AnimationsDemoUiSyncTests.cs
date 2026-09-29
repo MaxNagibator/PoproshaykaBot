@@ -80,7 +80,7 @@ public sealed class AnimationsDemoUiSyncTests
         if (!arrayMatch.Success)
         {
             throw new InvalidOperationException("Не нашли массив 'rangeFields' в animations-demo-config.js. "
-                                                + "Возможно, его переименовали — обновите тест или верните прежнее имя.");
+                                                + "Возможно, его переименовали – обновите тест или верните прежнее имя.");
         }
 
         return Regex.Matches(arrayMatch.Groups["body"].Value,

@@ -13,7 +13,7 @@ public sealed class SettingsMigratorTests
     }
 
     [Test]
-    public void TryMigrate_LegacySingleAccount_KeepsLoginAndDropsTokensWithScopes()
+    public void Migrate_LegacySingleAccount_KeepsLoginAndDropsTokensWithScopes()
     {
         const string Legacy = """
                               {
@@ -28,7 +28,7 @@ public sealed class SettingsMigratorTests
                               """;
 
         var root = Parse(Legacy);
-        var changed = SettingsMigrator.TryMigrate(root);
+        var changed = SettingsMigrator.Migrate(root).Changed;
 
         using (Assert.EnterMultipleScope())
         {
@@ -43,14 +43,14 @@ public sealed class SettingsMigratorTests
 
             var bot = twitch["botAccount"]!.AsObject();
             Assert.That(bot["login"]!.GetValue<string>(), Is.EqualTo("thevsakeeper"));
-            Assert.That(bot.ContainsKey("accessToken"), Is.False, "Старые токены сбрасываем — они выпущены под недостаточный набор прав");
-            Assert.That(bot.ContainsKey("refreshToken"), Is.False, "Старые токены сбрасываем — они выпущены под недостаточный набор прав");
+            Assert.That(bot.ContainsKey("accessToken"), Is.False, "Старые токены сбрасываем – они выпущены под недостаточный набор прав");
+            Assert.That(bot.ContainsKey("refreshToken"), Is.False, "Старые токены сбрасываем – они выпущены под недостаточный набор прав");
             Assert.That(bot.ContainsKey("storedScopes"), Is.False);
         }
     }
 
     [Test]
-    public void TryMigrate_LegacySingleAccount_PreservesBotAccountInJson()
+    public void Migrate_LegacySingleAccount_PreservesBotAccountInJson()
     {
         const string Legacy = """
                               {
@@ -64,7 +64,7 @@ public sealed class SettingsMigratorTests
                               """;
 
         var root = Parse(Legacy);
-        SettingsMigrator.TryMigrate(root);
+        SettingsMigrator.Migrate(root);
 
         var bot = root["twitch"]!.AsObject()["botAccount"]!.AsObject();
 
@@ -78,7 +78,7 @@ public sealed class SettingsMigratorTests
     }
 
     [Test]
-    public void TryMigrate_IntermediateWithStoredScopes_DropsTokensAndScopes()
+    public void Migrate_IntermediateWithStoredScopes_DropsTokensAndScopes()
     {
         const string Json = """
                             {
@@ -92,7 +92,7 @@ public sealed class SettingsMigratorTests
                             """;
 
         var root = Parse(Json);
-        var changed = SettingsMigrator.TryMigrate(root);
+        var changed = SettingsMigrator.Migrate(root).Changed;
 
         using (Assert.EnterMultipleScope())
         {
@@ -103,12 +103,12 @@ public sealed class SettingsMigratorTests
             Assert.That(twitch.ContainsKey("refreshToken"), Is.False);
             Assert.That(twitch.ContainsKey("scopes"), Is.False);
             Assert.That(twitch.ContainsKey("storedScopes"), Is.False);
-            Assert.That(twitch.ContainsKey("botAccount"), Is.False, "Без login и без токенов botAccount остаётся пустым — пусть его создаст десериализатор из дефолтов");
+            Assert.That(twitch.ContainsKey("botAccount"), Is.False, "Без login и без токенов botAccount остаётся пустым – пусть его создаст десериализатор из дефолтов");
         }
     }
 
     [Test]
-    public void TryMigrate_LegacyUiFields_AreRemoved()
+    public void Migrate_LegacyUiFields_AreRemoved()
     {
         const string Json = """
                             {
@@ -121,7 +121,7 @@ public sealed class SettingsMigratorTests
                             """;
 
         var root = Parse(Json);
-        var changed = SettingsMigrator.TryMigrate(root);
+        var changed = SettingsMigrator.Migrate(root).Changed;
 
         using (Assert.EnterMultipleScope())
         {
@@ -135,7 +135,7 @@ public sealed class SettingsMigratorTests
     }
 
     [Test]
-    public void TryMigrate_AlreadyCurrentSchema_ReturnsFalseAndDoesNotMutate()
+    public void Migrate_AlreadyCurrentSchema_ReturnsFalseAndDoesNotMutate()
     {
         const string Json = """
                             {
@@ -160,7 +160,7 @@ public sealed class SettingsMigratorTests
         var before = Parse(Json).ToJsonString();
         var root = JsonNode.Parse(before)!.AsObject();
 
-        var changed = SettingsMigrator.TryMigrate(root);
+        var changed = SettingsMigrator.Migrate(root).Changed;
 
         using (Assert.EnterMultipleScope())
         {
@@ -170,7 +170,7 @@ public sealed class SettingsMigratorTests
     }
 
     [Test]
-    public void TryMigrate_PartialState_DropsLegacyTopLevelTokenButKeepsBotAccountIntact()
+    public void Migrate_PartialState_DropsLegacyTopLevelTokenButKeepsBotAccountIntact()
     {
         const string Json = """
                             {
@@ -185,7 +185,7 @@ public sealed class SettingsMigratorTests
                             """;
 
         var root = Parse(Json);
-        var changed = SettingsMigrator.TryMigrate(root);
+        var changed = SettingsMigrator.Migrate(root).Changed;
 
         using (Assert.EnterMultipleScope())
         {
@@ -201,7 +201,7 @@ public sealed class SettingsMigratorTests
     }
 
     [Test]
-    public void TryMigrate_EmptyLegacyTokens_AreDiscardedSilently()
+    public void Migrate_EmptyLegacyTokens_AreDiscardedSilently()
     {
         const string Json = """
                             {
@@ -215,7 +215,7 @@ public sealed class SettingsMigratorTests
                             """;
 
         var root = Parse(Json);
-        var changed = SettingsMigrator.TryMigrate(root);
+        var changed = SettingsMigrator.Migrate(root).Changed;
 
         using (Assert.EnterMultipleScope())
         {
@@ -231,16 +231,16 @@ public sealed class SettingsMigratorTests
     }
 
     [Test]
-    public void TryMigrate_NoTwitchSection_DoesNotCrash()
+    public void Migrate_NoTwitchSection_DoesNotCrash()
     {
         var root = Parse("{}");
-        var changed = SettingsMigrator.TryMigrate(root);
+        var changed = SettingsMigrator.Migrate(root).Changed;
 
         Assert.That(changed, Is.False);
     }
 
     [Test]
-    public void TryMigrate_TwiceOnLegacyJson_IsIdempotent()
+    public void Migrate_TwiceOnLegacyJson_IsIdempotent()
     {
         const string Legacy = """
                               {
@@ -254,9 +254,9 @@ public sealed class SettingsMigratorTests
                               """;
 
         var root = Parse(Legacy);
-        var firstChanged = SettingsMigrator.TryMigrate(root);
+        var firstChanged = SettingsMigrator.Migrate(root).Changed;
         var snapshot = root.ToJsonString();
-        var secondChanged = SettingsMigrator.TryMigrate(root);
+        var secondChanged = SettingsMigrator.Migrate(root).Changed;
 
         using (Assert.EnterMultipleScope())
         {

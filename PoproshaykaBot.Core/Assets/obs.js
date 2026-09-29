@@ -15,6 +15,7 @@
     let enableMessageShadows = true;
     let enableSpecialEffects = true;
     let showUserAvatars = false;
+    let showMessageImages = false;
 
     let enableSmoothScroll = true;
     let scrollAnimationDuration = 300;
@@ -509,6 +510,7 @@
             [isHighlightMentions, 'no-mentions'],
             [showTimestamp, 'no-timestamp'],
             [showUserAvatars, 'no-avatars'],
+            [showMessageImages, 'no-message-images'],
         ];
         toggles.forEach(([enabled, className]) => {
             if (!enabled) messageDiv.classList.add(className);
@@ -551,7 +553,9 @@
         `;
         } else {
             const badgesHtml = renderBadges(message.badges || []);
-            const messageWithEmotes = renderMessageWithEmotes(message.message, message.emotes || []);
+            const messageText = String(message.message ?? '');
+            const image = pickMessageImage(message.images, message.imageLinks, messageText);
+            const messageWithEmotes = renderMessageWithEmotes(messageText, message.emotes || [], image);
             const avatarHtml = renderAvatarPlaceholder(message.userId);
 
             const usernameClasses = ['username', ...userTypeClasses].join(' ');
@@ -566,12 +570,15 @@
                 ${usernameHtml}
             </div>`;
 
-            const bodyHtml = `<div class="message-text">${messageWithEmotes}</div>`;
+            const textClasses = image && image.linkOnly ? 'message-text message-text-link-only' : 'message-text';
+            const bodyHtml = `<div class="${textClasses}">${messageWithEmotes}</div>`;
+            const imagesHtml = renderMessageImage(image);
 
             const contentHtml = `
             <div class="message-content">
                 ${headerHtml}
                 ${bodyHtml}
+                ${imagesHtml}
             </div>`;
 
             if (avatarHtml) {
@@ -584,6 +591,8 @@
             } else {
                 messageDiv.innerHTML = contentHtml;
             }
+
+            attachMessageImage(messageDiv);
         }
 
         chatContainer.appendChild(messageDiv);
@@ -631,39 +640,114 @@
         }).join('');
     }
 
-    function renderMessageWithEmotes(message, emotes) {
-        if (!emotes || emotes.length === 0) {
-            return highlightMentions(escapeHtml(message));
+    const messageImageProxyPrefix = '/api/image?';
+
+    function pickMessageImage(images, imageLinks, text) {
+        if (!showMessageImages || !Array.isArray(images) || images.length === 0) {
+            return null;
         }
 
-        const originalLength = message.length;
-        const sortedEmotes = emotes.sort((a, b) => b.startIndex - a.startIndex);
+        const url = images[0];
 
-        let result = message;
-        for (const emote of sortedEmotes) {
+        if (typeof url !== 'string' || !url.startsWith(messageImageProxyPrefix)) {
+            return null;
+        }
+
+        const range = Array.isArray(imageLinks) ? imageLinks[0] : null;
+
+        if (!range || !isValidRange(range.startIndex, range.endIndex, text.length)) {
+            return { url, link: null, linkOnly: false };
+        }
+
+        const link = { startIndex: range.startIndex, endIndex: range.endIndex };
+        const linkOnly = text.substring(0, link.startIndex).trim() === ''
+            && text.substring(link.endIndex + 1).trim() === '';
+
+        return { url, link, linkOnly };
+    }
+
+    function isValidRange(startIndex, endIndex, length) {
+        return Number.isInteger(startIndex) && Number.isInteger(endIndex)
+            && startIndex >= 0 && endIndex >= startIndex && endIndex < length;
+    }
+
+    function renderMessageImage(image) {
+        if (!image) {
+            return '';
+        }
+
+        return `<div class="message-images"><img class="message-image" src="${escapeAttr(image.url)}" alt="" loading="lazy"></div>`;
+    }
+
+    function attachMessageImage(messageDiv) {
+        const image = messageDiv.querySelector('.message-image');
+
+        if (!image) {
+            return;
+        }
+
+        image.addEventListener('error', () => {
+            const container = image.closest('.message-images');
+            if (container) container.remove();
+        }, { once: true });
+
+        image.addEventListener('load', () => {
+            image.classList.add('message-image-loaded');
+            messageDiv.classList.add('has-message-image');
+        }, { once: true });
+    }
+
+    function renderMessageWithEmotes(message, emotes, image) {
+        const fragments = [];
+
+        for (const emote of emotes) {
             if (!emote.imageUrl) {
                 continue;
             }
 
-            if (!Number.isInteger(emote.startIndex) || !Number.isInteger(emote.endIndex)
-                || emote.startIndex < 0 || emote.endIndex < emote.startIndex
-                || emote.endIndex >= originalLength) {
+            if (!isValidRange(emote.startIndex, emote.endIndex, message.length)) {
                 console.warn('Пропущен эмоут с некорректными индексами:', emote);
                 continue;
             }
 
-            const before = result.substring(0, emote.startIndex);
-            const after = result.substring(emote.endIndex + 1);
-
             const animatedClass = enableSpecialEffects && isAnimatedEmote(emote.name) ? ' animated' : '';
             const src = escapeAttr(emote.imageUrl);
             const name = escapeAttr(emote.name);
-            const emoteImg = `<img src="${src}" alt="${name}" title="${name}" class="emote${animatedClass}">`;
 
-            result = before + emoteImg + after;
+            fragments.push({
+                start: emote.startIndex,
+                end: emote.endIndex,
+                html: `<img src="${src}" alt="${name}" title="${name}" class="emote${animatedClass}">`,
+            });
         }
 
-        return highlightMentions(escapeHtml(result, true));
+        const link = image && image.link;
+
+        if (link) {
+            const linkText = escapeHtml(message.substring(link.startIndex, link.endIndex + 1));
+
+            fragments.push({
+                start: link.startIndex,
+                end: link.endIndex,
+                html: `<span class="message-image-link">${linkText}</span>`,
+            });
+        }
+
+        fragments.sort((a, b) => a.start - b.start);
+
+        let html = '';
+        let cursor = 0;
+
+        for (const fragment of fragments) {
+            if (fragment.start < cursor) {
+                continue;
+            }
+
+            html += highlightMentions(escapeHtml(message.substring(cursor, fragment.start))) + fragment.html;
+            cursor = fragment.end + 1;
+        }
+
+        return html + highlightMentions(escapeHtml(message.substring(cursor)));
     }
 
     function isAnimatedEmote(emoteName) {
@@ -694,25 +778,7 @@
             .replaceAll('>', '&gt;');
     }
 
-    function escapeHtml(text, preserveImgTags = false) {
-        if (preserveImgTags) {
-            const imgTags = [];
-            text = text.replace(/<img[^>]*>/g, match => {
-                imgTags.push(match);
-                return `__IMG_PLACEHOLDER_${imgTags.length - 1}__`;
-            });
-
-            text = text.replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;')
-                .replaceAll("'", '&#039;');
-
-            text = text.replace(/__IMG_PLACEHOLDER_(\d+)__/g, (match, index) => imgTags[Number.parseInt(index, 10)]);
-
-            return text;
-        }
-
+    function escapeHtml(text) {
         return text.replaceAll('&', '&amp;')
             .replaceAll('<', '&lt;')
             .replaceAll('>', '&gt;')
@@ -736,6 +802,7 @@
         ['emoteSize', '--emote-size'],
         ['badgeSize', '--badge-size'],
         ['userAvatarSize', '--avatar-size'],
+        ['messageImageMaxHeight', '--message-image-max-height'],
     ];
 
     const animationFieldMap = {
@@ -785,6 +852,7 @@
             ['enableSpecialEffects', '.message', 'no-special-effects', v => enableSpecialEffects = v, () => enableSpecialEffects],
             ['showTimestamp', '#chat .message', 'no-timestamp', v => showTimestamp = v, () => showTimestamp],
             ['showUserAvatars', '.message', 'no-avatars', v => showUserAvatars = v, () => showUserAvatars],
+            ['showMessageImages', '.message', 'no-message-images', v => showMessageImages = v, () => showMessageImages],
         ];
 
         toggles.forEach(([key, selector, className, setter, getter]) => {

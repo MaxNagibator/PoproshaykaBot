@@ -1,0 +1,316 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.TitleBarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:bootstrap="clr-namespace:PoproshaykaBot.Wpf.Bootstrap"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:ShellViewModel}"
+             d:DesignHeight="36"
+             d:DesignWidth="1100">
+
+    <UserControl.Resources>
+        <Style x:Key="Theme.SegmentButton"
+               TargetType="Button">
+            <Setter Property="Background"
+                    Value="Transparent" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Secondary}" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="MinHeight"
+                    Value="32" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Center" />
+            <Setter Property="VerticalContentAlignment"
+                    Value="Center" />
+            <Setter Property="FocusVisualStyle"
+                    Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{DynamicResource Radius.S}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource Bg.SurfaceAlt}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Accent.Soft}" />
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Accent.Text}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Background="{DynamicResource Bg.Surface}"
+            BorderBrush="{DynamicResource Border.Subtle}"
+            BorderThickness="0,0,0,1"
+            keepshell:TitleBarBehavior.IsWindowChrome="True">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0"
+                  Margin="14,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal">
+                    <Image Width="18"
+                           Height="18"
+                           VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image.Source>
+                            <BitmapImage UriSource="pack://application:,,,/Assets/icon.ico"
+                                         DecodePixelWidth="48" />
+                        </Image.Source>
+                    </Image>
+                    <TextBlock Text="PoproshaykaBot"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold" />
+                </StackPanel>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding BuildLabel}"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center"
+                           Margin="10,1,10,0"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding BuildTooltip}"
+                           AutomationProperties.Name="Версия сборки"
+                           shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+            </Grid>
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsOverviewSelected}"
+                                                   Value="True" />
+                                        <Condition Binding="{Binding Overview.IsEditing}"
+                                                   Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility"
+                                            Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+
+                    <Button Content="Готово"
+                            Command="{Binding Overview.ToggleEditCommand}"
+                            MinHeight="26"
+                            Padding="12,3"
+                            Margin="0,0,6,0"
+                            AutomationProperties.Name="Выйти из режима правки панели" />
+
+                    <Button Content="Отменить"
+                            Style="{StaticResource Button.Ghost}"
+                            Command="{Binding Overview.UndoCommand}"
+                            IsEnabled="{Binding Overview.CanUndo}"
+                            MinHeight="26"
+                            Padding="10,3"
+                            Margin="0,0,6,0"
+                            AutomationProperties.Name="Отменить последнюю правку раскладки" />
+
+                    <Button x:Name="AddTileButton"
+                            Content="Добавить плитку"
+                            Style="{StaticResource Button.Ghost}"
+                            Click="OnMenuButtonClick"
+                            MinHeight="26"
+                            Padding="10,3"
+                            Margin="0,0,6,0"
+                            AutomationProperties.Name="Добавить плитку на панель">
+                        <Button.ContextMenu>
+                            <ContextMenu ItemsSource="{Binding Overview.HiddenTiles}">
+                                <ContextMenu.ItemContainerStyle>
+                                    <Style TargetType="MenuItem">
+                                        <Setter Property="Header"
+                                                Value="{Binding Title}" />
+                                        <Setter Property="Command"
+                                                Value="{Binding PlacementTarget.DataContext.Overview.AddTileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                        <Setter Property="CommandParameter"
+                                                Value="{Binding TypeId}" />
+                                    </Style>
+                                </ContextMenu.ItemContainerStyle>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+
+                    <Button Content="Сбросить"
+                            Style="{StaticResource Button.Ghost}"
+                            Command="{Binding Overview.ResetLayoutCommand}"
+                            MinHeight="26"
+                            Padding="10,3"
+                            Margin="0,0,10,0"
+                            AutomationProperties.Name="Сбросить раскладку панели к умолчаниям" />
+                </StackPanel>
+
+                <Button Command="{Binding Overview.ToggleEditCommand}"
+                        VerticalAlignment="Center"
+                        MinHeight="26"
+                        Padding="10,3"
+                        Margin="0,0,8,0"
+                        ToolTip="Настроить расположение плиток"
+                        AutomationProperties.Name="Настроить панель">
+                    <Button.Style>
+                        <Style TargetType="Button"
+                               BasedOn="{StaticResource Button.Ghost}">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsOverviewSelected}"
+                                                   Value="True" />
+                                        <Condition Binding="{Binding Overview.CanEdit}"
+                                                   Value="True" />
+                                        <Condition Binding="{Binding Overview.IsEditing}"
+                                                   Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility"
+                                            Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Settings}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,6,0" />
+
+                        <TextBlock Text="Настроить панель"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button Style="{StaticResource Button.Primary}"
+                        Content="{Binding ConnectButtonText}"
+                        Command="{Binding ToggleConnectCommand}"
+                        VerticalAlignment="Center"
+                        MinHeight="26"
+                        Padding="14,3"
+                        Margin="0,0,10,0" />
+
+                <Button x:Name="RestartButton"
+                        Style="{StaticResource Theme.SegmentButton}"
+                        Click="OnMenuButtonClick"
+                        Width="36"
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,0"
+                        ToolTip="Перезапустить"
+                        AutomationProperties.Name="Перезапустить приложение"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.RotateCw}"
+                                              Width="16"
+                                              Height="16" />
+                    <Button.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Перезапустить"
+                                      Command="{Binding PlacementTarget.DataContext.RestartCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      ToolTip="Закрыть как обычно – с вопросом о несохранённом и прощанием в чате – и запустить заново" />
+                            <MenuItem Header="Перезапустить принудительно"
+                                      Command="{Binding PlacementTarget.DataContext.RestartForcedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      ToolTip="Без штатной остановки бота – если приложение зависло или не закрывается" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
+
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,8,0">
+                    <Button Style="{StaticResource Theme.SegmentButton}"
+                            Command="{Binding Theme.ApplyCommand}"
+                            CommandParameter="{x:Static bootstrap:AppTheme.Light}"
+                            Tag="{Binding Theme.IsLight}"
+                            Width="36"
+                            ToolTip="Светлая тема"
+                            AutomationProperties.Name="Светлая тема">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Sun}"
+                                                  Width="16"
+                                                  Height="16" />
+                    </Button>
+                    <Button Style="{StaticResource Theme.SegmentButton}"
+                            Command="{Binding Theme.ApplyCommand}"
+                            CommandParameter="{x:Static bootstrap:AppTheme.Dark}"
+                            Tag="{Binding Theme.IsDark}"
+                            Width="36"
+                            Margin="2,0,0,0"
+                            ToolTip="Тёмная тема"
+                            AutomationProperties.Name="Тёмная тема">
+                        <iconPacks:PackIconLucide Kind="{x:Static iconPacks:PackIconLucideKind.Moon}"
+                                                  Width="16"
+                                                  Height="16" />
+                    </Button>
+                </StackPanel>
+
+                <Border Width="1"
+                        Background="{DynamicResource Border.Subtle}"
+                        Margin="0,8" />
+
+                <Button Style="{StaticResource Chrome.Button}"
+                        keepshell:ChromeAction.Action="Minimize"
+                        ToolTip="Свернуть">
+                    <Path Data="M 0,5 L 10,5"
+                          Style="{StaticResource Chrome.Glyph}" />
+                </Button>
+                <Button Style="{StaticResource Chrome.Button}"
+                        keepshell:ChromeAction.Action="MaxRestore"
+                        ToolTip="Развернуть">
+                    <Path Style="{StaticResource Chrome.Glyph.MaxRestore}" />
+                </Button>
+                <Button Style="{StaticResource Chrome.Button.Close}"
+                        keepshell:ChromeAction.Action="Close"
+                        ToolTip="Закрыть">
+                    <Path Data="M 0,0 L 10,10 M 10,0 L 0,10"
+                          Style="{StaticResource Chrome.Glyph}" />
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -142,8 +142,6 @@ public sealed partial class HttpServerCheckPage : OnboardingPageBase
 
     private async Task<bool> TryRestartServerAsync(int newPort, int previousLivePort)
     {
-        var liveSettings = SettingsManager.Current;
-
         try
         {
             if (KestrelHttpServer.IsRunning)
@@ -151,7 +149,7 @@ public sealed partial class HttpServerCheckPage : OnboardingPageBase
                 await KestrelHttpServer.StopAsync();
             }
 
-            liveSettings.Twitch.HttpServerPort = newPort;
+            SettingsManager.UpdateCurrent(settings => settings.Twitch.HttpServerPort = newPort);
 
             await KestrelHttpServer.StartAsync();
 
@@ -162,7 +160,7 @@ public sealed partial class HttpServerCheckPage : OnboardingPageBase
         {
             Logger.LogError(exception, "Ошибка запуска HTTP сервера на порту {Port} в onboarding", newPort);
 
-            liveSettings.Twitch.HttpServerPort = previousLivePort;
+            SettingsManager.UpdateCurrent(settings => settings.Twitch.HttpServerPort = previousLivePort);
 
             try
             {

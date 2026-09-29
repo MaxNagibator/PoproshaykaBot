@@ -20,7 +20,7 @@ public sealed class ChatHistoryEndpointTests
 
         _bus = new(NullLogger<InMemoryEventBus>.Instance);
 
-        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance);
+        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance, null, null);
         _settings = new();
         _settingsManager.Current.Returns(_settings);
 

@@ -2,7 +2,9 @@
 using PoproshaykaBot.Core.Infrastructure.Events.Lifecycle;
 using PoproshaykaBot.Core.Settings;
 using PoproshaykaBot.Core.Settings.Stores;
+using PoproshaykaBot.Core.Tests.Polls;
 using PoproshaykaBot.Core.Twitch.Auth;
+using PoproshaykaBot.Core.Twitch.Chat;
 using System.Net;
 using System.Text;
 
@@ -19,7 +21,7 @@ public sealed class TwitchOAuthServiceTests
         _settings = new();
         _settings.Twitch.ClientId = "test-client-id";
         _settings.Twitch.ClientSecret = "test-client-secret";
-        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance);
+        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance, null, null);
         _settingsManager.Current.Returns(_settings);
         _accountsStore = new(filePath: Path.Combine(_tempDir, "accounts.json"));
 
@@ -27,12 +29,13 @@ public sealed class TwitchOAuthServiceTests
         _handler = new();
         _httpFactory.CreateClient(Arg.Any<string>()).Returns(_ => new(_handler, false));
         _eventBus = Substitute.For<IEventBus>();
+        _clock = new() { UtcNow = new(2026, 9, 1, 12, 0, 0, TimeSpan.Zero) };
 
         var statusReporter = new OAuthStatusReporter(NullLogger<OAuthStatusReporter>.Instance);
         var tokenClient = new OAuthTokenClient(_httpFactory, NullLogger<OAuthTokenClient>.Instance);
         var accountWriter = new OAuthAccountWriter(_accountsStore, _eventBus, statusReporter, NullLogger<OAuthAccountWriter>.Instance);
         var flow = new OAuthFlowCoordinator(tokenClient, accountWriter, statusReporter, _accountsStore, _settingsManager, NullLogger<OAuthFlowCoordinator>.Instance);
-        var refresher = new OAuthTokenRefresher(tokenClient, accountWriter, statusReporter, _accountsStore, _settingsManager, _eventBus, NullLogger<OAuthTokenRefresher>.Instance);
+        var refresher = new OAuthTokenRefresher(tokenClient, accountWriter, statusReporter, _accountsStore, _settingsManager, _eventBus, _clock, NullLogger<OAuthTokenRefresher>.Instance);
 
         _service = new(flow, refresher, tokenClient, accountWriter, statusReporter);
     }
@@ -58,6 +61,7 @@ public sealed class TwitchOAuthServiceTests
     private IHttpClientFactory _httpFactory = null!;
     private FakeHttpMessageHandler _handler = null!;
     private IEventBus _eventBus = null!;
+    private TestTimeProvider _clock = null!;
     private TwitchOAuthService _service = null!;
 
     [Test]
@@ -138,7 +142,7 @@ public sealed class TwitchOAuthServiceTests
         {
             Assert.That(second, Is.Null);
             Assert.That(_handler.Requests.Count, Is.EqualTo(requestsAfterFirst),
-                "Повторный GetAccessTokenAsync не должен снова идти в Twitch — токены очищены");
+                "Повторный GetAccessTokenAsync не должен снова идти в Twitch – токены очищены");
         }
     }
 
@@ -179,13 +183,132 @@ public sealed class TwitchOAuthServiceTests
             "Transient ошибки не должны сжигать refresh-токен");
     }
 
+    [TestCase(HttpStatusCode.Forbidden, 300)]
+    [TestCase(HttpStatusCode.InternalServerError, 15)]
+    public async Task GetAccessToken_WhenRefreshFails_HoldsRetriesUntilBackoffElapses(HttpStatusCode status, int backoffSeconds)
+    {
+        SeedExpiredBotTokens();
+        _handler.Responder = _ => MakeJson(status, $"{{\"status\":{(int)status},\"message\":\"boom\"}}");
+
+        Assert.That(await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot), Is.Null);
+        Assert.That(_handler.Requests, Has.Count.EqualTo(1));
+
+        _clock.UtcNow += TimeSpan.FromSeconds(backoffSeconds - 1);
+        Assert.That(await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot), Is.Null);
+        Assert.That(_handler.Requests, Has.Count.EqualTo(1),
+            "Пока выдержка не истекла, повторный запрос к Twitch не уходит");
+
+        _clock.UtcNow += TimeSpan.FromSeconds(2);
+        Assert.That(await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot), Is.Null);
+        Assert.That(_handler.Requests, Has.Count.EqualTo(2),
+            "После выдержки попытка повторяется");
+    }
+
+    [Test]
+    public async Task GetAccessToken_WhenTransientFailuresRepeat_BackoffGrows()
+    {
+        SeedExpiredBotTokens();
+        _handler.Responder = _ => MakeJson(HttpStatusCode.InternalServerError, "{\"status\":500,\"message\":\"boom\"}");
+
+        await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot);
+        _clock.UtcNow += TimeSpan.FromSeconds(15);
+        await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot);
+        Assert.That(_handler.Requests, Has.Count.EqualTo(2));
+
+        _clock.UtcNow += TimeSpan.FromSeconds(15);
+        await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot);
+        Assert.That(_handler.Requests, Has.Count.EqualTo(2),
+            "Вторая неудача подряд удваивает выдержку до 30 секунд");
+
+        _clock.UtcNow += TimeSpan.FromSeconds(15);
+        await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot);
+        Assert.That(_handler.Requests, Has.Count.EqualTo(3));
+    }
+
+    [Test]
+    public async Task GetAccessToken_WhenRefreshSucceedsAfterFailure_ClearsBackoff()
+    {
+        SeedExpiredBotTokens();
+        _handler.Responder = _ => MakeJson(HttpStatusCode.InternalServerError, "{\"status\":500,\"message\":\"boom\"}");
+
+        await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot);
+
+        _clock.UtcNow += TimeSpan.FromSeconds(15);
+        _handler.Responder = request => request.RequestUri!.AbsoluteUri.Contains("validate", StringComparison.Ordinal)
+            ? MakeJson(HttpStatusCode.OK, "{\"login\":\"bot-login\",\"user_id\":\"bot-id\",\"client_id\":\"test-client-id\",\"scopes\":[],\"expires_in\":3600}")
+            : MakeJson(HttpStatusCode.OK, "{\"access_token\":\"fresh-access\",\"expires_in\":3600,\"refresh_token\":\"fresh-refresh\",\"scope\":[],\"token_type\":\"bearer\"}");
+
+        Assert.That(await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot), Is.EqualTo("fresh-access"));
+
+        _accountsStore.Mutate(TwitchOAuthRole.Bot, account => account.AccessTokenExpiresAt = _clock.UtcNow.AddMinutes(-1));
+        _handler.Responder = _ => MakeJson(HttpStatusCode.InternalServerError, "{\"status\":500,\"message\":\"boom\"}");
+
+        var requestsBefore = _handler.Requests.Count;
+        await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot);
+
+        Assert.That(_handler.Requests, Has.Count.EqualTo(requestsBefore + 1),
+            "Успешное обновление снимает выдержку, накопленную прошлыми сбоями");
+    }
+
+    [Test]
+    public void RefreshTokenAsync_WhenServerRejectsCredentials_KeepsBackoffForAutomaticPath()
+    {
+        SeedExpiredBotTokens();
+        _handler.Responder = _ => MakeJson(HttpStatusCode.Forbidden,
+            "{\"status\":403,\"message\":\"invalid client secret\"}");
+
+        Assert.ThrowsAsync<OAuthTokenRequestException>(async () =>
+            await _service.RefreshTokenAsync(TwitchOAuthRole.Bot,
+                _settings.Twitch.ClientId,
+                _settings.Twitch.ClientSecret,
+                "stale-refresh"));
+
+        var requestsAfterManual = _handler.Requests.Count;
+
+        Assert.That(_service.GetAccessTokenAsync(TwitchOAuthRole.Bot).Result, Is.Null);
+        Assert.That(_handler.Requests, Has.Count.EqualTo(requestsAfterManual),
+            "Неудачная ручная попытка ставит роль на выдержку, а не снимает её");
+    }
+
+    [Test]
+    public async Task Черновик_переавторизации_с_новым_правом_не_сбрасывает_токен_как_смену_набора()
+    {
+        string[] previous = [TwitchScopes.UserReadChat, TwitchScopes.UserWriteChat, TwitchScopes.UserBot];
+
+        _accountsStore.Mutate(TwitchOAuthRole.Bot, account =>
+        {
+            account.AccessToken = "old-access";
+            account.Scopes = previous;
+            account.StoredScopes = previous;
+        });
+
+        var draft = _accountsStore.Load(TwitchOAuthRole.Bot);
+
+        new OAuthFlowResult("fresh-access", "fresh-refresh", [..TwitchScopes.BotRequired, ..TwitchScopes.BotOptional], "bot-login", "bot-id", 3600)
+            .ApplyTo(draft, _clock.UtcNow);
+
+        _accountsStore.SaveAll(draft, _accountsStore.Load(TwitchOAuthRole.Broadcaster));
+
+        var token = await _service.GetAccessTokenAsync(TwitchOAuthRole.Bot);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(token, Is.EqualTo("fresh-access"),
+                "Выданные права черновик несёт вместе с запрошенными – иначе первая же выдача токена приняла бы переавторизацию за смену набора");
+
+            Assert.That(TwitchScopes.IsGranted(_accountsStore.LoadBot(), TwitchScopes.UserManageWhispers), Is.True);
+        });
+
+        await _eventBus.DidNotReceiveWithAnyArgs().PublishAsync(default(BotConnectionStatusUpdated)!, default);
+    }
+
     private void SeedExpiredBotTokens()
     {
         _accountsStore.Mutate(TwitchOAuthRole.Bot, account =>
         {
             account.AccessToken = "stale-access";
             account.RefreshToken = "stale-refresh";
-            account.AccessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+            account.AccessTokenExpiresAt = _clock.UtcNow.AddMinutes(-1);
             account.Login = "bot-login";
             account.UserId = "bot-id";
         });

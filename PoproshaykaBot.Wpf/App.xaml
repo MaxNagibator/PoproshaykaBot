@@ -1,0 +1,17 @@
+﻿<Application x:Class="PoproshaykaBot.Wpf.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Themes/Light.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Themes/Tokens.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Converters.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/KeepShell;component/Resources/Styles/Controls.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/PoproshaykaBot.Wpf;component/Infrastructure/Converters/AppConverters.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/PoproshaykaBot.Wpf;component/Resources/TableStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/PoproshaykaBot.Wpf;component/Resources/RatingStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

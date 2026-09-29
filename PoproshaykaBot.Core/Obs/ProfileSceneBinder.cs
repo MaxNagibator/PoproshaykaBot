@@ -124,7 +124,7 @@ public sealed class ProfileSceneBinder :
 
         if (!_obs.IsConnected)
         {
-            _logger.LogDebug("ProfileSceneBinder: OBS не подключён — сцена «{Scene}» не переключена", scene);
+            _logger.LogDebug("ProfileSceneBinder: OBS не подключён – сцена «{Scene}» не переключена", scene);
             return Task.CompletedTask;
         }
 
@@ -190,7 +190,7 @@ public sealed class ProfileSceneBinder :
 
         try
         {
-            _workerTask.Wait(TimeSpan.FromSeconds(2));
+            _workerTask.Wait(TimeSpan.FromSeconds(2), CancellationToken.None);
         }
         catch (AggregateException)
         {
@@ -289,7 +289,7 @@ public sealed class ProfileSceneBinder :
 
         if (snapshot.LastAppliedProfileId == profile.Id)
         {
-            _logger.LogDebug("ProfileSceneBinder: профиль «{Profile}» уже активен — повторное применение пропущено",
+            _logger.LogDebug("ProfileSceneBinder: профиль «{Profile}» уже активен – повторное применение пропущено",
                 profile.Name);
 
             return;

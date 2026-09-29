@@ -5,9 +5,9 @@ namespace PoproshaykaBot.Core.Chat.Commands;
 
 public sealed class ProfileCommand(BroadcastProfilesManager manager, ILogger<ProfileCommand> logger) : IChatCommand
 {
-    public string Canonical => "profile";
-    public IReadOnlyCollection<string> Aliases => ["профиль"];
-    public string Description => "применить сохранённый профиль трансляции";
+    public string Canonical => "пресет";
+    public IReadOnlyCollection<string> Aliases => ["preset"];
+    public string Description => "применить пресет – сохранённый профиль трансляции";
 
     public bool CanExecute(CommandContext context)
     {
@@ -18,7 +18,7 @@ public sealed class ProfileCommand(BroadcastProfilesManager manager, ILogger<Pro
     {
         if (context.Arguments.Count == 0)
         {
-            return OutgoingMessage.Reply("Использование: !profile <имя>", context.MessageId);
+            return OutgoingMessage.Reply("Использование: !пресет <имя>", context.MessageId);
         }
 
         var name = string.Join(" ", context.Arguments);
@@ -26,18 +26,18 @@ public sealed class ProfileCommand(BroadcastProfilesManager manager, ILogger<Pro
 
         if (profile == null)
         {
-            return OutgoingMessage.Reply($"""Профиль "{name}" не найден""", context.MessageId);
+            return OutgoingMessage.Reply($"Пресет «{name}» не найден", context.MessageId);
         }
 
         try
         {
             await manager.ApplyAsync(profile.Id, cancellationToken);
-            return OutgoingMessage.Reply($"Профиль применён: {profile.Name}", context.MessageId);
+            return OutgoingMessage.Reply($"Пресет применён: {profile.Name}", context.MessageId);
         }
         catch (Exception exception)
         {
             logger.LogWarning(exception, "Не удалось применить профиль '{Name}' из чата", profile.Name);
-            return OutgoingMessage.Reply($"Не удалось применить профиль: {profile.Name}", context.MessageId);
+            return OutgoingMessage.Reply($"Не удалось применить пресет: {profile.Name}", context.MessageId);
         }
     }
 }

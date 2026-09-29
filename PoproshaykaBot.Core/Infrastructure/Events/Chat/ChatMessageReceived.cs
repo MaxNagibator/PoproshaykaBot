@@ -13,4 +13,5 @@ public sealed record ChatMessageReceived(
     UserStatus Status,
     bool IsFirstTime,
     ChatMessageData HistoryEntry,
-    bool IsBot = false) : EventBase;
+    bool IsBot = false,
+    CommandResponseMark? CommandResponse = null) : EventBase;

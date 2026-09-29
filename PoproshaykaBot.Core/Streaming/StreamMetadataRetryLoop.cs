@@ -86,7 +86,7 @@ internal sealed class StreamMetadataRetryLoop(
             }
             catch
             {
-                // disposing — swallow any leftover failure
+                // disposing – swallow any leftover failure
             }
         }
 

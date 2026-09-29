@@ -22,6 +22,8 @@ public sealed class TrumpCommand : IChatCommand
     public IReadOnlyCollection<string> Aliases => ["trump"];
     public string Description => "курс TRUMP с расчетом X2Illson профита/луса (только для qp_illson)";
 
+    public bool IsRestrictedToAllowedUsers => true;
+
     public bool CanExecute(CommandContext context)
     {
         return true;

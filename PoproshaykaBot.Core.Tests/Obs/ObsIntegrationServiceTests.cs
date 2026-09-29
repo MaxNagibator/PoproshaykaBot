@@ -1,5 +1,6 @@
 ﻿using PoproshaykaBot.Core.Obs;
 using PoproshaykaBot.Core.Settings;
+using PoproshaykaBot.Core.Settings.Obs;
 using System.Text.Json;
 
 namespace PoproshaykaBot.Core.Tests.Obs;
@@ -18,7 +19,7 @@ public sealed class ObsIntegrationServiceTests
             },
         };
 
-        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance);
+        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance, null, null);
         _settingsManager.Current.Returns(_settings);
         _client = new();
         _service = new(_client, _settingsManager, NullLogger<ObsIntegrationService>.Instance);
@@ -396,6 +397,33 @@ public sealed class ObsIntegrationServiceTests
         Assert.That(inputNames, Is.EqualTo(new[] { "Desktop Audio", "Mic/Aux" }));
     }
 
+    [Test]
+    public async Task Подключение_без_ответа_OBS_не_ставит_время_последнего_обмена()
+    {
+        var obsSettings = new ObsIntegrationSettings
+        {
+            Enabled = true,
+        };
+
+        await _service.ConnectAsync(obsSettings, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_service.CurrentStatus.IsConnected, Is.True);
+            Assert.That(_service.LastExchangeAt, Is.Null);
+        }
+
+        _client.EnqueueResponse("GetVersion", """{"obsVersion":"31.0.0","obsWebSocketVersion":"5.5.2"}""");
+
+        await _service.ConnectAsync(obsSettings, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_service.LastExchangeAt, Is.Not.Null);
+            Assert.That(_service.LastExchangeAt, Is.EqualTo(_client.LastExchangeAt));
+        }
+    }
+
     private sealed class FakeObsWebSocketClient : IObsWebSocketClient
     {
         private readonly Dictionary<string, Queue<JsonElement?>> _responses = new(StringComparer.Ordinal);
@@ -407,6 +435,8 @@ public sealed class ObsIntegrationServiceTests
         }
 
         public bool IsConnected { get; private set; }
+
+        public DateTimeOffset? LastExchangeAt { get; private set; }
 
         public int ConnectCount { get; private set; }
 
@@ -431,6 +461,7 @@ public sealed class ObsIntegrationServiceTests
 
             if (_responses.TryGetValue(requestType, out var queue) && queue.Count > 0)
             {
+                LastExchangeAt = DateTimeOffset.UtcNow;
                 return Task.FromResult(queue.Dequeue());
             }
 

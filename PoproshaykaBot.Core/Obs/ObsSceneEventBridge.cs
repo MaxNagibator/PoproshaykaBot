@@ -9,7 +9,7 @@ namespace PoproshaykaBot.Core.Obs;
 /// <summary>
 /// Транслирует сырое obs-websocket событие <c>CurrentProgramSceneChanged</c> в типизированное
 /// <see cref="ObsCurrentProgramSceneChanged" /> на <see cref="IEventBus" />. Подписка живёт весь
-/// процесс (как и сам клиент): обработчик вызывается из receive-loop OBS, поэтому публикация —
+/// процесс (как и сам клиент): обработчик вызывается из receive-loop OBS, поэтому публикация –
 /// fire-and-forget, чтобы не блокировать приём остальных событий (volume meters, запись, сцены).
 /// </summary>
 internal sealed class ObsSceneEventBridge(

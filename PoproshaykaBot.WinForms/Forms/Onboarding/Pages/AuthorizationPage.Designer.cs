@@ -117,7 +117,7 @@ partial class AuthorizationPage
         _buttonsHintLabel.Margin = new Padding(0, 0, 0, 10);
         _buttonsHintLabel.MaximumSize = new Size(640, 0);
         _buttonsHintLabel.Name = "_buttonsHintLabel";
-        _buttonsHintLabel.Text = "🍪 — нужно, только если хотите, чтобы чат-плитка на дашборде была залогинена этим аккаунтом (эмоты, бейджи, sub-only сообщения). Иначе достаточно «Открыть в браузере».";
+        _buttonsHintLabel.Text = "🍪 – нужно, только если хотите, чтобы чат-плитка на дашборде была залогинена этим аккаунтом (эмоты, бейджи, sub-only сообщения). Иначе достаточно «Открыть в браузере».";
         _buttonsHintLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // _cancelButton

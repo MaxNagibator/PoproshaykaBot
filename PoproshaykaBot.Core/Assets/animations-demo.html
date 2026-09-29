@@ -250,6 +250,44 @@
             </details>
 
             <details>
+                <summary>Картинки в сообщениях</summary>
+                <div class="demo-config-section">
+                    <div class="demo-field demo-field-checkbox">
+                        <input id="cfg-showMessageImages"
+                               type="checkbox">
+                        <label class="demo-field-label"
+                               for="cfg-showMessageImages">Показывать картинку по ссылке</label>
+                    </div>
+                    <div class="demo-field">
+                        <label class="demo-field-label" for="cfg-messageImageRoles">Чьи ссылки показывать</label>
+                        <select id="cfg-messageImageRoles"
+                                multiple
+                                size="5">
+                            <option value="Broadcaster">Стример</option>
+                            <option value="Moderator">Модераторы</option>
+                            <option value="Vip">VIP</option>
+                            <option value="Subscriber">Подписчики</option>
+                            <option value="Everyone">Все зрители</option>
+                        </select>
+                    </div>
+                    <div class="demo-field demo-field-text">
+                        <label class="demo-field-label" for="cfg-messageImageAllowedHosts">Разрешённые хосты</label>
+                        <textarea id="cfg-messageImageAllowedHosts"
+                                  rows="5"
+                                  spellcheck="false"></textarea>
+                    </div>
+                    <div class="demo-field">
+                        <label class="demo-field-label" for="cfg-messageImageMaxHeightPixels">Высота картинки</label>
+                        <input id="cfg-messageImageMaxHeightPixels"
+                               type="range">
+                        <span class="demo-field-value"
+                              data-suffix="px"
+                              id="cfg-messageImageMaxHeightPixels-value"></span>
+                    </div>
+                </div>
+            </details>
+
+            <details>
                 <summary>Поведение и эффекты</summary>
                 <div class="demo-config-section">
                     <div class="demo-field demo-field-checkbox">

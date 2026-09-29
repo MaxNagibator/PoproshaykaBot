@@ -27,6 +27,9 @@ public sealed class ObsChatCssSettings
     public bool ShowUserAvatars { get; set; }
     public string UserAvatarSize { get; set; } = "32px";
 
+    public bool ShowMessageImages { get; set; }
+    public string MessageImageMaxHeight { get; set; } = "160px";
+
     public bool ShowUserTypeBorders { get; set; } = true;
     public bool HighlightFirstTimeUsers { get; set; } = true;
     public bool HighlightMentions { get; set; } = true;
@@ -77,6 +80,9 @@ public sealed class ObsChatCssSettings
 
             ShowUserAvatars = safeSettings.ShowUserAvatars,
             UserAvatarSize = $"{ObsChatRanges.Clamp(safeSettings.UserAvatarSizePixels, ObsChatRanges.UserAvatarSizeMin, ObsChatRanges.UserAvatarSizeMax)}px",
+
+            ShowMessageImages = safeSettings.ShowMessageImages,
+            MessageImageMaxHeight = $"{ObsChatRanges.Clamp(safeSettings.MessageImageMaxHeightPixels, ObsChatRanges.MessageImageMaxHeightMin, ObsChatRanges.MessageImageMaxHeightMax)}px",
 
             ShowUserTypeBorders = safeSettings.ShowUserTypeBorders,
             HighlightFirstTimeUsers = safeSettings.HighlightFirstTimeUsers,

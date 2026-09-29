@@ -11,16 +11,21 @@ internal sealed class SmokeTestSession : IDisposable
 {
     public const string AppExeName = "PoproshaykaBot.WinForms.exe";
     public const string AppExePathEnvVar = "POPROSHAYKA_APP_EXE";
+    private const string AppProjectName = "PoproshaykaBot.WinForms";
+    private const string TestProjectName = "PoproshaykaBot.WinForms.Tests";
     public const string BaseDirectoryEnvVar = "POPROSHAYKA_BASE_DIR";
 
     private static readonly TimeSpan DefaultWindowAppearTimeout = TimeSpan.FromSeconds(30);
 
-    private SmokeTestSession(string baseDirectory, FlaUIApplication app, UIA3Automation automation, Window mainWindow)
+    private readonly UiSmokeLock _uiLock;
+
+    private SmokeTestSession(string baseDirectory, FlaUIApplication app, UIA3Automation automation, Window mainWindow, UiSmokeLock uiLock)
     {
         BaseDirectory = baseDirectory;
         App = app;
         Automation = automation;
         MainWindow = mainWindow;
+        _uiLock = uiLock;
     }
 
     public FlaUIApplication App { get; }
@@ -39,31 +44,34 @@ internal sealed class SmokeTestSession : IDisposable
 
         if (!File.Exists(appPath))
         {
-            Assert.Ignore($"Исполняемый файл приложения не найден: {appPath}. Соберите PoproshaykaBot.WinForms перед запуском UI-тестов.");
+            Assert.Fail($"Исполняемый файл приложения не найден: {appPath}. Соберите PoproshaykaBot.WinForms перед запуском UI-тестов.");
         }
 
-        var baseDirectory = CreateTempBaseDirectory();
-
-        if (options.SeedConfiguredSettings)
-        {
-            SeedConfiguredSettings(baseDirectory);
-        }
-
-        var processStartInfo = new ProcessStartInfo
-        {
-            FileName = appPath,
-            Arguments = "--ui-smoke",
-            WorkingDirectory = Path.GetDirectoryName(appPath)!,
-            UseShellExecute = false,
-        };
-
-        processStartInfo.EnvironmentVariables[BaseDirectoryEnvVar] = baseDirectory;
+        var uiLock = UiSmokeLock.Acquire();
+        var baseDirectory = string.Empty;
 
         UIA3Automation? automation = null;
         FlaUIApplication? app = null;
 
         try
         {
+            baseDirectory = CreateTempBaseDirectory();
+
+            if (options.SeedConfiguredSettings)
+            {
+                SeedConfiguredSettings(baseDirectory);
+            }
+
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = appPath,
+                Arguments = "--ui-smoke",
+                WorkingDirectory = Path.GetDirectoryName(appPath)!,
+                UseShellExecute = false,
+            };
+
+            processStartInfo.EnvironmentVariables[BaseDirectoryEnvVar] = baseDirectory;
+
             automation = new();
             app = FlaUIApplication.Launch(processStartInfo);
 
@@ -71,7 +79,7 @@ internal sealed class SmokeTestSession : IDisposable
             var mainWindow = WaitForFirstTopLevelWindow(app, automation, timeout)
                              ?? throw new InvalidOperationException($"Не удалось обнаружить ни одного top-level окна процесса в течение {timeout}");
 
-            return new(baseDirectory, app, automation, mainWindow);
+            return new(baseDirectory, app, automation, mainWindow, uiLock);
         }
         catch
         {
@@ -87,6 +95,7 @@ internal sealed class SmokeTestSession : IDisposable
             app?.Dispose();
             automation?.Dispose();
             CleanupBaseDirectory(baseDirectory);
+            uiLock.Dispose();
             throw;
         }
     }
@@ -148,6 +157,7 @@ internal sealed class SmokeTestSession : IDisposable
         }
 
         CleanupBaseDirectory(BaseDirectory);
+        _uiLock.Dispose();
     }
 
     private static Window? WaitForFirstTopLevelWindow(FlaUIApplication app, UIA3Automation automation, TimeSpan timeout)
@@ -212,14 +222,21 @@ internal sealed class SmokeTestSession : IDisposable
         var testAssemblyDir = Path.GetDirectoryName(typeof(SmokeTestSession).Assembly.Location)
                               ?? throw new InvalidOperationException("Не удалось определить каталог тестовой сборки");
 
-        var configuration = new DirectoryInfo(testAssemblyDir).Parent?.Name
-                            ?? throw new InvalidOperationException("Не удалось определить конфигурацию сборки");
+        var testProjectDirectory = Path.DirectorySeparatorChar + TestProjectName + Path.DirectorySeparatorChar;
+        var separatorIndex = testAssemblyDir.LastIndexOf(testProjectDirectory, StringComparison.OrdinalIgnoreCase);
 
-        return Path.GetFullPath(Path.Combine(testAssemblyDir,
-            "..", "..", "..", "..",
-            "PoproshaykaBot.WinForms",
-            "bin", configuration, "net8.0-windows",
-            AppExeName));
+        if (separatorIndex < 0)
+        {
+            throw new InvalidOperationException(
+                $"Каталог тестовой сборки не содержит сегмента {TestProjectName}: {testAssemblyDir}");
+        }
+
+        var appAssemblyDir = string.Concat(
+            testAssemblyDir.AsSpan(0, separatorIndex + 1),
+            AppProjectName,
+            testAssemblyDir.AsSpan(separatorIndex + testProjectDirectory.Length - 1));
+
+        return Path.GetFullPath(Path.Combine(appAssemblyDir, AppExeName));
     }
 
     private static string CreateTempBaseDirectory()

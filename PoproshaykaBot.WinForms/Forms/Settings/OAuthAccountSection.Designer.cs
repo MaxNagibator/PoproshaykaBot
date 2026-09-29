@@ -335,7 +335,7 @@
             _accountLoginValueLabel.Name = "_accountLoginValueLabel";
             _accountLoginValueLabel.Size = new Size(322, 15);
             _accountLoginValueLabel.TabIndex = 6;
-            _accountLoginValueLabel.Text = "—";
+            _accountLoginValueLabel.Text = "–";
             _accountLoginValueLabel.TextAlign = ContentAlignment.MiddleLeft;
             //
             // _tokenStatusLabel

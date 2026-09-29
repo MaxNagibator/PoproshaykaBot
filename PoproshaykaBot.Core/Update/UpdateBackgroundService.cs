@@ -24,7 +24,7 @@ public sealed class UpdateBackgroundService(
     {
         if (coordinator.Kind == UpdateKind.Unsupported)
         {
-            logger.LogInformation("Сборка не поддерживает автообновление — фоновая проверка отключена");
+            logger.LogInformation("Сборка не поддерживает автообновление – фоновая проверка отключена");
             return Task.CompletedTask;
         }
 
@@ -70,15 +70,28 @@ public sealed class UpdateBackgroundService(
     {
         try
         {
+            logger.LogInformation("Фоновая проверка обновлений запущена: период {IntervalHours} ч, тип сборки {Kind}, обновляемая {IsUpdatable}",
+                Math.Max(1, store.Load().CheckIntervalHours),
+                coordinator.Kind,
+                coordinator.IsUpdatable);
+
             await Task.Delay(InitialDelay, timeProvider, cancellationToken).ConfigureAwait(false);
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 var settings = store.Load();
 
-                if (settings.AutoCheckEnabled && coordinator.IsUpdatable)
+                if (settings.AutoCheckEnabled is false)
                 {
-                    await coordinator.CheckNowAsync(cancellationToken).ConfigureAwait(false);
+                    logger.LogInformation("Проверка обновлений пропущена: автопроверка выключена в настройках");
+                }
+                else if (coordinator.IsUpdatable is false)
+                {
+                    logger.LogInformation("Проверка обновлений пропущена: сборка {Kind} сейчас не обновляется", coordinator.Kind);
+                }
+                else if (await coordinator.CheckNowAsync(cancellationToken).ConfigureAwait(false) is { } candidate)
+                {
+                    await coordinator.TryPrepareSilentlyAsync(candidate, cancellationToken).ConfigureAwait(false);
                 }
 
                 var hours = Math.Max(1, settings.CheckIntervalHours);

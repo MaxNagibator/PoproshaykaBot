@@ -236,7 +236,7 @@
             Name = "BroadcastProfileCard";
             Padding = new Padding(6, 4, 6, 4);
             DoubleClick += OnCardDoubleClick;
-            _toolTip.SetToolTip(this, "Двойной клик — применить, ПКМ — действия");
+            _toolTip.SetToolTip(this, "Двойной клик – применить, ПКМ – действия");
             _menu.ResumeLayout(false);
             _mainLayout.ResumeLayout(false);
             _mainLayout.PerformLayout();

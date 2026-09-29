@@ -1,3 +1,4 @@
+﻿using PoproshaykaBot.Core.Chat.Commands;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Chat;
 
@@ -22,6 +23,12 @@ public sealed class SseChatBridgeHandler :
 
     public Task HandleAsync(ChatMessageReceived @event, CancellationToken cancellationToken)
     {
+        if (@event.CommandResponse is { } commandResponse
+            && !commandResponse.Target.GoesToOverlay())
+        {
+            return Task.CompletedTask;
+        }
+
         _sseService.AddChatMessage(@event.HistoryEntry);
         return Task.CompletedTask;
     }

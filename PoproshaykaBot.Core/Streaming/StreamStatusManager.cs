@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Streaming;
 using PoproshaykaBot.Core.Infrastructure.Hosting;
@@ -7,7 +8,6 @@ using PoproshaykaBot.Core.Settings;
 using PoproshaykaBot.Core.Twitch;
 using PoproshaykaBot.Core.Twitch.EventSub;
 using PoproshaykaBot.Core.Twitch.Helix;
-using System.Net;
 using System.Text.Json;
 
 namespace PoproshaykaBot.Core.Streaming;
@@ -15,10 +15,12 @@ namespace PoproshaykaBot.Core.Streaming;
 public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsyncDisposable
 {
     private static readonly JsonSerializerOptions WebJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan RefreshGateDrainTimeout = TimeSpan.FromSeconds(2);
 
     private readonly ITwitchEventSubClient _eventSubClient;
     private readonly ITwitchHelixClient _helix;
     private readonly IBroadcasterIdProvider _broadcasterIdProvider;
+    private readonly ITargetChannelProvider _targetChannelProvider;
     private readonly SettingsManager _settingsManager;
     private readonly IEventBus _eventBus;
     private readonly TimeProvider _timeProvider;
@@ -27,6 +29,9 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
     private readonly StreamStateMachine _state = new();
     private readonly StreamMetadataRetryLoop _metadataRetryLoop;
     private readonly CancellationTokenSource _disposeCts = new();
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private readonly EventSubSubscriptionLedger _ledger;
+    private readonly EventSubSubscriptionRetry _retry;
 
     private IDisposable? _channelUpdatedSubscription;
     private CancellationTokenSource? _runCts;
@@ -39,6 +44,7 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
         [FromKeyedServices(TwitchEndpoints.HelixBotClient)]
         ITwitchHelixClient helix,
         IBroadcasterIdProvider broadcasterIdProvider,
+        ITargetChannelProvider targetChannelProvider,
         SettingsManager settingsManager,
         IEventBus eventBus,
         TimeProvider timeProvider,
@@ -47,11 +53,14 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
         _eventSubClient = eventSubClient;
         _helix = helix;
         _broadcasterIdProvider = broadcasterIdProvider;
+        _targetChannelProvider = targetChannelProvider;
         _settingsManager = settingsManager;
         _eventBus = eventBus;
         _timeProvider = timeProvider;
         _logger = logger;
         _metadataRetryLoop = new(FetchMetadataAttemptAsync, IsCurrentlyOnline, logger);
+        _ledger = new(helix, logger);
+        _retry = new(helix, eventSubClient, timeProvider, logger);
     }
 
     public StreamStatus CurrentStatus => _state.CurrentStatus;
@@ -118,6 +127,9 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
         _state.ResetToUnknown();
 
+        await _retry.CancelAndDrainAsync(cancellationToken).ConfigureAwait(false);
+        await _ledger.CloseAsync(cancellationToken).ConfigureAwait(false);
+
         _logger.LogInformation("StreamStatusManager: подписки на EventSub сняты, состояние сброшено в Unknown");
     }
 
@@ -138,7 +150,18 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
             await _runCts.CancelAsync();
         }
 
+        _retry.Cancel();
+
         await _metadataRetryLoop.DisposeAsync().ConfigureAwait(false);
+
+        if (await _refreshGate.WaitAsync(RefreshGateDrainTimeout, CancellationToken.None).ConfigureAwait(false))
+        {
+            _refreshGate.Dispose();
+        }
+        else
+        {
+            _logger.LogDebug("Опрос Helix не завершился за {Timeout} – семафор опроса оставлен сборщику мусора", RefreshGateDrainTimeout);
+        }
 
         _disposeCts.Dispose();
         _runCts?.Dispose();
@@ -166,6 +189,16 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
         try
         {
+            await _refreshGate.WaitAsync(token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogDebug(ex, "Live-snapshot отменён в очереди: StreamStatusManager уничтожается");
+            return;
+        }
+
+        try
+        {
             var broadcasterId = await _broadcasterIdProvider.GetAsync(token);
 
             if (string.IsNullOrEmpty(broadcasterId))
@@ -174,7 +207,6 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
                 return;
             }
 
-            _logger.LogDebug("Live-snapshot: запрос статуса для BroadcasterId {BroadcasterId} (текущий статус {CurrentStatus})", broadcasterId, CurrentStatus);
             var stream = await _helix.GetStreamAsync(broadcasterId, token);
 
             if (stream != null)
@@ -183,12 +215,19 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
                 if (transition.Transitioned)
                 {
-                    _logger.LogInformation("Live-snapshot: переход {OldStatus} → Online для BroadcasterId {BroadcasterId}", transition.Previous, broadcasterId);
+                    _logger.LogInformation("Live-snapshot: переход {OldStatus} → Online для BroadcasterId {BroadcasterId}, стрим {StreamId}, начат {StartedAt}",
+                        transition.Previous,
+                        broadcasterId,
+                        stream.Id,
+                        stream.StartedAt);
+
                     await PublishStatusTransitionAsync(StreamStatus.Online, true).ConfigureAwait(false);
                 }
-                else
+                else if (transition.SnapshotChanged)
                 {
-                    _logger.LogDebug("Live-snapshot: статус Online подтверждён для BroadcasterId {BroadcasterId}", broadcasterId);
+                    _logger.LogInformation("Live-snapshot: метаданные стрима {StreamId} обновлены без смены статуса", stream.Id);
+
+                    await PublishMetadataResolvedAsync().ConfigureAwait(false);
                 }
 
                 return;
@@ -199,20 +238,19 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
             switch (probe.Action)
             {
                 case OfflineProbeAction.ForcedOffline:
-                    _logger.LogWarning("Принудительный перевод в Offline после {ElapsedSeconds} с расхождения с API для BroadcasterId {BroadcasterId}",
-                        (int)probe.Elapsed.TotalSeconds, broadcasterId);
+                    _logger.LogWarning("Принудительный перевод в Offline после {ElapsedSeconds} с расхождения с API для BroadcasterId {BroadcasterId}, стрим {StreamId}",
+                        (int)probe.Elapsed.TotalSeconds, broadcasterId, CurrentStream?.Id);
 
                     await PublishStatusTransitionAsync(StreamStatus.Offline).ConfigureAwait(false);
                     return;
 
                 case OfflineProbeAction.Pending:
-                    _logger.LogWarning("API сообщает офлайн при локальном Online, ждём подтверждения (расхождение {Elapsed}/{Threshold})",
-                        probe.Elapsed, StuckOnlineThreshold);
+                    _logger.LogWarning("API сообщает офлайн при локальном Online, ждём подтверждения (расхождение {Elapsed}/{Threshold}), стрим {StreamId}",
+                        probe.Elapsed, StuckOnlineThreshold, CurrentStream?.Id);
 
                     return;
 
                 default:
-                    _logger.LogDebug("Live-snapshot: статус Offline подтверждён для BroadcasterId {BroadcasterId}", broadcasterId);
                     return;
             }
         }
@@ -224,12 +262,17 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
         {
             _logger.LogError(ex, "Не удалось обновить live-snapshot стрима: {Reason}", StreamingErrorMessages.SafeMessage(ex));
         }
+        finally
+        {
+            _refreshGate.Release();
+        }
     }
 
     private async Task OnSessionWelcomeAsync(EventSubSessionWelcomeArgs args, CancellationToken cancellationToken)
     {
         _logger.LogInformation("EventSub WebSocket подключен. SessionId: {SessionId}", args.SessionId);
 
+        _retry.Cancel();
         _state.ForgetChannelUpdate();
 
         await CreateEventSubSubscriptionsAsync(args.SessionId, cancellationToken);
@@ -256,7 +299,7 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
     private Task OnSessionReconnectAsync(EventSubReconnectArgs args, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("EventSub session_reconnect → {Url} (старый session: {OldSession})", args.ReconnectUrl, args.OldSessionId);
+        _logger.LogInformation("Сессия EventSub мигрировала: {OldSession} → {NewSession}; подписки и статус стрима сохраняются", args.OldSessionId, args.NewSessionId);
         return Task.CompletedTask;
     }
 
@@ -264,17 +307,22 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
     {
         if (args.SubscriptionType is not ("stream.online" or "stream.offline"))
         {
-            _logger.LogDebug("Revocation {Type} не относится к StreamStatusManager — игнорируется", args.SubscriptionType);
+            _logger.LogDebug("Revocation {Type} не относится к StreamStatusManager – игнорируется", args.SubscriptionType);
             return;
         }
 
         _logger.LogWarning("EventSub revocation: id={Id}, type={Type}, status={Status}", args.SubscriptionId, args.SubscriptionType, args.Status);
+        _ledger.Forget(args.SubscriptionType, args.SubscriptionId);
 
-        if (string.IsNullOrEmpty(_eventSubClient.SessionId))
+        var sessionId = _eventSubClient.SessionId;
+
+        if (string.IsNullOrEmpty(sessionId))
         {
             _logger.LogDebug("Восстановление подписки {Type} пропущено: SessionId уже отсутствует", args.SubscriptionType);
             return;
         }
+
+        var generation = _ledger.Generation;
 
         try
         {
@@ -291,17 +339,24 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
                 { "broadcaster_user_id", broadcasterId },
             };
 
-            var newId = await _helix.CreateEventSubSubscriptionAsync(args.SubscriptionType,
+            var result = await _retry.CreateAsync(args.SubscriptionType,
                 "1",
                 condition,
-                _eventSubClient.SessionId,
+                sessionId,
+                retried => _ledger.RecordAsync(generation, args.SubscriptionType, retried),
                 cancellationToken);
 
-            _logger.LogInformation("Подписка {Type} восстановлена после revocation. Новый id: {Id}", args.SubscriptionType, newId);
-        }
-        catch (HelixRequestException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
-        {
-            _logger.LogInformation(ex, "Подписка {Type} уже существует для текущей EventSub-сессии — переиспользуем", args.SubscriptionType);
+            await _ledger.RecordAsync(generation, args.SubscriptionType, result);
+
+            if (result.Outcome == EventSubSubscribeOutcome.Created)
+            {
+                _logger.LogInformation("Подписка {Type} восстановлена после revocation. Новый id: {Id}", args.SubscriptionType, result.SubscriptionIds[0]);
+            }
+            else if (result.Outcome == EventSubSubscribeOutcome.Reused)
+            {
+                _logger.LogInformation("Подписка {Type} {SubscriptionIds} уже существует для текущей EventSub-сессии – переиспользуем",
+                    args.SubscriptionType, result.SubscriptionIds);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -312,8 +367,12 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
     private Task OnDisconnectedAsync(EventSubDisconnectedArgs args, CancellationToken cancellationToken)
     {
-        _logger.LogWarning("EventSub WebSocket отключен ({Reason}) — статус стрима сброшен в Unknown до восстановления соединения", args.Reason);
+        _logger.LogWarning("EventSub WebSocket отключен ({Reason}) – статус стрима {OldStatus} (стрим {StreamId}) сброшен в Unknown до восстановления соединения",
+            args.Reason,
+            _state.CurrentStatus,
+            CurrentStream?.Id);
 
+        _retry.Cancel();
         _state.ResetToUnknown();
         return Task.CompletedTask;
     }
@@ -322,6 +381,16 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
     {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
         var token = linkedCts.Token;
+
+        try
+        {
+            await _refreshGate.WaitAsync(token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogDebug(ex, "Инициализация по API отменена в очереди опроса");
+            return;
+        }
 
         try
         {
@@ -352,20 +421,41 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
             if (transition.Transitioned)
             {
-                _logger.LogInformation("Инициализация: статус стрима {OldStatus} → {NewStatus} для BroadcasterId {BroadcasterId}",
-                    transition.Previous, newStatus, broadcasterId);
-
                 var isCatchUp = transition.Previous == StreamStatus.Unknown;
+
+                _logger.LogInformation("Инициализация: статус стрима {OldStatus} → {NewStatus} для BroadcasterId {BroadcasterId}, стрим {StreamId}, начат {StartedAt}, catch-up {IsCatchUp}",
+                    transition.Previous,
+                    newStatus,
+                    broadcasterId,
+                    stream?.Id,
+                    stream?.StartedAt,
+                    isCatchUp);
+
                 await PublishStatusTransitionAsync(newStatus, isCatchUp).ConfigureAwait(false);
             }
             else
             {
-                _logger.LogDebug("Инициализация: статус стрима {Status} подтверждён для BroadcasterId {BroadcasterId}", newStatus, broadcasterId);
+                _logger.LogDebug("Инициализация: статус стрима {Status} подтверждён для BroadcasterId {BroadcasterId}, стрим {StreamId}",
+                    newStatus,
+                    broadcasterId,
+                    stream?.Id);
+
+                if (transition.SnapshotChanged && newStatus == StreamStatus.Online)
+                {
+                    _logger.LogInformation("Инициализация: метаданные стрима {StreamId} обновлены без смены статуса", stream?.Id);
+
+                    await PublishMetadataResolvedAsync().ConfigureAwait(false);
+                }
             }
 
-            _logger.LogInformation(stream != null
-                ? "Начальный статус: онлайн (по данным API)"
-                : "Начальный статус: офлайн (по данным API)");
+            if (stream != null)
+            {
+                _logger.LogInformation("Начальный статус по данным API: онлайн, стрим {StreamId}, начат {StartedAt}", stream.Id, stream.StartedAt);
+            }
+            else
+            {
+                _logger.LogInformation("Начальный статус по данным API: офлайн");
+            }
         }
         catch (OperationCanceledException ex) when (token.IsCancellationRequested)
         {
@@ -375,6 +465,10 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
         catch (Exception ex)
         {
             _logger.LogError(ex, "Не удалось получить начальный статус стрима: {Reason}", StreamingErrorMessages.SafeMessage(ex));
+        }
+        finally
+        {
+            _refreshGate.Release();
         }
     }
 
@@ -395,14 +489,28 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
     {
         var data = payload.Deserialize<EventSubStreamOnlinePayloadDto>(WebJsonOptions);
 
-        _logger.LogInformation("Стрим запущен (EventSub), тип: {EventType}", data?.Event?.Type ?? "live");
+        const bool isCatchUp = false;
 
-        var transition = _state.MarkOnline();
+        var streamId = data?.Event?.Id;
+        var startedAt = data?.Event?.StartedAt ?? default;
+        var eventType = data?.Event?.Type ?? "live";
+
+        _logger.LogInformation("Стрим запущен (EventSub): стрим {StreamId}, начат {StartedAt}, тип {EventType}",
+            streamId,
+            startedAt,
+            eventType);
+
+        var transition = _state.MarkOnline(streamId, startedAt);
 
         if (transition.Transitioned)
         {
-            _logger.LogInformation("EventSub: переход {OldStatus} → Online", transition.Previous);
-            await PublishStatusTransitionAsync(StreamStatus.Online).ConfigureAwait(false);
+            _logger.LogInformation("EventSub: переход {OldStatus} → Online, стрим {StreamId}, начат {StartedAt}, catch-up {IsCatchUp}",
+                transition.Previous,
+                streamId,
+                startedAt,
+                isCatchUp);
+
+            await PublishStatusTransitionAsync(StreamStatus.Online, isCatchUp).ConfigureAwait(false);
         }
 
         var runToken = _runCts?.Token ?? CancellationToken.None;
@@ -411,13 +519,15 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
     private async Task HandleStreamOfflineAsync()
     {
-        _logger.LogInformation("Стрим завершен (EventSub)");
+        var streamId = CurrentStream?.Id;
+
+        _logger.LogInformation("Стрим завершен (EventSub): стрим {StreamId}", streamId);
 
         var transition = _state.ApplyOffline();
 
         if (transition.Transitioned)
         {
-            _logger.LogInformation("EventSub: переход {OldStatus} → Offline", transition.Previous);
+            _logger.LogInformation("EventSub: переход {OldStatus} → Offline, стрим {StreamId}", transition.Previous, streamId);
             await PublishStatusTransitionAsync(StreamStatus.Offline).ConfigureAwait(false);
         }
     }
@@ -426,29 +536,38 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
     {
         try
         {
-            var broadcasterId = await _broadcasterIdProvider.GetAsync(cancellationToken);
+            await _refreshGate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-            if (string.IsNullOrEmpty(broadcasterId))
+            try
             {
-                return false;
+                var broadcasterId = await _broadcasterIdProvider.GetAsync(cancellationToken);
+
+                if (string.IsNullOrEmpty(broadcasterId))
+                {
+                    return false;
+                }
+
+                var stream = await _helix.GetStreamAsync(broadcasterId, cancellationToken);
+
+                if (stream == null)
+                {
+                    return false;
+                }
+
+                _state.UpdateStreamSnapshot(StreamInfoMapper.MapFromHelix(stream));
+
+                if (_state.CurrentStream == null)
+                {
+                    return false;
+                }
+
+                await PublishMetadataResolvedAsync().ConfigureAwait(false);
+                return true;
             }
-
-            var stream = await _helix.GetStreamAsync(broadcasterId, cancellationToken);
-
-            if (stream == null)
+            finally
             {
-                return false;
+                _refreshGate.Release();
             }
-
-            _state.UpdateStreamSnapshot(StreamInfoMapper.MapFromHelix(stream));
-
-            if (_state.CurrentStream == null)
-            {
-                return false;
-            }
-
-            await PublishMetadataResolvedAsync().ConfigureAwait(false);
-            return true;
         }
         catch (OperationCanceledException)
         {
@@ -470,7 +589,7 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
     private Task PublishStatusTransitionAsync(StreamStatus newStatus, bool isCatchUp = false)
     {
-        var channel = _settingsManager.Current.Twitch.Channel;
+        var channel = _targetChannelProvider.Current.Login;
 
         if (string.IsNullOrWhiteSpace(channel))
         {
@@ -480,15 +599,15 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
 
         return newStatus switch
         {
-            StreamStatus.Online => _eventBus.PublishAsync(new StreamWentOnline(channel, CurrentStream, isCatchUp)),
-            StreamStatus.Offline => _eventBus.PublishAsync(new StreamWentOffline(channel, isCatchUp)),
+            StreamStatus.Online => _eventBus.PublishAsync(new StreamWentOnline(channel, CurrentStream, isCatchUp), CancellationToken.None),
+            StreamStatus.Offline => _eventBus.PublishAsync(new StreamWentOffline(channel, isCatchUp), CancellationToken.None),
             _ => Task.CompletedTask,
         };
     }
 
     private Task PublishMetadataResolvedAsync()
     {
-        var channel = _settingsManager.Current.Twitch.Channel;
+        var channel = _targetChannelProvider.Current.Login;
         var stream = CurrentStream;
 
         if (string.IsNullOrWhiteSpace(channel) || stream == null)
@@ -497,16 +616,17 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
             return Task.CompletedTask;
         }
 
-        return _eventBus.PublishAsync(new StreamMetadataResolved(channel, stream));
+        return _eventBus.PublishAsync(new StreamMetadataResolved(channel, stream), CancellationToken.None);
     }
 
     private async Task CreateEventSubSubscriptionsAsync(string sessionId, CancellationToken cancellationToken)
     {
+        var generation = await _ledger.BeginSessionAsync(cancellationToken);
         var broadcasterId = await _broadcasterIdProvider.GetAsync(cancellationToken);
 
         if (string.IsNullOrEmpty(broadcasterId))
         {
-            _logger.LogWarning("Подписки EventSub пропущены — BroadcasterId недоступен (вероятно, нет токена бота). Подписки создадутся после авторизации.");
+            _logger.LogWarning("Подписки EventSub пропущены – BroadcasterId недоступен (вероятно, нет токена бота). Подписки создадутся после авторизации.");
             return;
         }
 
@@ -522,23 +642,28 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
         {
             try
             {
-                var subscriptionId = await _helix.CreateEventSubSubscriptionAsync(type,
+                var result = await _retry.CreateAsync(type,
                     "1",
                     condition,
                     sessionId,
+                    retried => _ledger.RecordAsync(generation, type, retried),
                     cancellationToken);
 
-                subscriptionsCreated++;
+                if (await _ledger.RecordAsync(generation, type, result) && result.IsSubscribed)
+                {
+                    subscriptionsCreated++;
+                }
 
-                _logger.LogInformation("Подписка '{Type}' создана. SubscriptionId: {SubscriptionId}, SessionId: {SessionId}",
-                    type, subscriptionId, sessionId);
-            }
-            catch (HelixRequestException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
-            {
-                subscriptionsCreated++;
-
-                _logger.LogInformation(ex, "Подписка '{Type}' уже существует для текущей EventSub-сессии — переиспользуем (SessionId: {SessionId})",
-                    type, sessionId);
+                if (result.Outcome == EventSubSubscribeOutcome.Created)
+                {
+                    _logger.LogInformation("Подписка '{Type}' создана. SubscriptionId: {SubscriptionId}, SessionId: {SessionId}",
+                        type, result.SubscriptionIds[0], sessionId);
+                }
+                else if (result.Outcome == EventSubSubscribeOutcome.Reused)
+                {
+                    _logger.LogInformation("Подписка '{Type}' {SubscriptionIds} уже существует для текущей EventSub-сессии – переиспользуем (SessionId: {SessionId})",
+                        type, result.SubscriptionIds, sessionId);
+                }
             }
             catch (Exception ex)
             {
@@ -553,7 +678,7 @@ public class StreamStatusManager : IStreamStatus, IStreamHostedComponent, IAsync
         }
         else
         {
-            _logger.LogWarning("Создано только {CreatedCount}/2 подписок EventSub stream.* для BroadcasterId {BroadcasterId} — статус стрима будет неполным",
+            _logger.LogWarning("Создано только {CreatedCount}/2 подписок EventSub stream.* для BroadcasterId {BroadcasterId} – статус стрима будет неполным",
                 subscriptionsCreated, broadcasterId);
         }
     }

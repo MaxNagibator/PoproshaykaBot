@@ -187,7 +187,7 @@ public sealed partial class ObsInfoWidget : UserControl, IDashboardTileHeaderPro
 
     private static string ToDisplayValue(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ? "—" : value;
+        return string.IsNullOrWhiteSpace(value) ? "–" : value;
     }
 
     private static (string Text, ObsCardChipTone Tone)? FormatStreamHealth(
@@ -345,7 +345,7 @@ public sealed partial class ObsInfoWidget : UserControl, IDashboardTileHeaderPro
             else if (refreshed == 0)
             {
                 ShowChatRefreshToast($"🔁 ни один из {configuredCount} не обновлён", Color.DarkRed);
-                Logger.LogWarning("Ручной refresh: OBS отклонил все {Count} запросов — проверьте имена источников", configuredCount);
+                Logger.LogWarning("Ручной refresh: OBS отклонил все {Count} запросов – проверьте имена источников", configuredCount);
             }
             else if (refreshed < configuredCount)
             {
@@ -736,7 +736,7 @@ public sealed partial class ObsInfoWidget : UserControl, IDashboardTileHeaderPro
     private void ApplyDisabledState()
     {
         UpdateConnectionHeader("○ OBS выкл.", Color.Gray, "OBS интеграция отключена в настройках");
-        _sceneLabel.Text = "Сцена: —";
+        _sceneLabel.Text = "Сцена: –";
         _streamStatusCard.ApplyUnknown();
         _recordStatusCard.ApplyUnknown();
         ClearRows();
@@ -748,7 +748,7 @@ public sealed partial class ObsInfoWidget : UserControl, IDashboardTileHeaderPro
             Color.Red,
             string.IsNullOrWhiteSpace(message) ? "OBS WebSocket не подключён" : $"OBS WebSocket не подключён: {message}");
 
-        _sceneLabel.Text = "Сцена: —";
+        _sceneLabel.Text = "Сцена: –";
         _streamStatusCard.ApplyUnavailable(message);
         _recordStatusCard.ApplyUnavailable(message);
         ClearRows();

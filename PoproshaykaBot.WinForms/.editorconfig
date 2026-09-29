@@ -1,3 +1,6 @@
 ﻿[*.cs]
 
 dotnet_diagnostic.VSTHRD100.severity = silent
+
+# WFO1000: [Inject]-свойства контролов рантайм-only, designer-сериализация им не нужна (проект ретайрится при cutover на WPF)
+dotnet_diagnostic.WFO1000.severity = none

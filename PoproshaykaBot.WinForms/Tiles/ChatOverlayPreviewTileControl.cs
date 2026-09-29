@@ -77,7 +77,7 @@ public sealed partial class ChatOverlayPreviewTileControl : UserControl, IDashbo
         {
             _webView.Visible = false;
             _fallbackLabel.Visible = true;
-            _fallbackLabel.Text = "Не удалось открыть OBS-превью чата. Подробности — в логах.";
+            _fallbackLabel.Text = "Не удалось открыть OBS-превью чата. Подробности – в логах.";
             _fallbackLabel.BringToFront();
 
             Logger.LogError(ex, "Ошибка инициализации WebView2");

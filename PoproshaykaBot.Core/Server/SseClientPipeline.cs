@@ -5,8 +5,11 @@ namespace PoproshaykaBot.Core.Server;
 
 public sealed class SseClientPipeline
 {
+    private static int _lastClientId;
+
     public SseClientPipeline(HttpResponse response, int capacity)
     {
+        ClientId = Interlocked.Increment(ref _lastClientId);
         Response = response;
         Channel = System.Threading.Channels.Channel.CreateBounded<byte[]>(new BoundedChannelOptions(capacity)
         {
@@ -15,6 +18,8 @@ public sealed class SseClientPipeline
             SingleWriter = false,
         });
     }
+
+    public int ClientId { get; }
 
     public HttpResponse Response { get; }
 

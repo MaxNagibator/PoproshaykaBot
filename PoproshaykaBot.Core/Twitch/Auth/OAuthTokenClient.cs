@@ -103,7 +103,7 @@ public sealed class OAuthTokenClient(
                 throw new OAuthRefreshRejectedException(errorStatus, errorMessage);
             }
 
-            throw new InvalidOperationException($"OAuth error {errorStatus}: {errorMessage ?? "нет описания"}");
+            throw new OAuthTokenRequestException(response.StatusCode, errorStatus, errorMessage);
         }
 
         TokenResponse? tokenResponse;
@@ -160,10 +160,20 @@ internal sealed record OAuthErrorResponse(
     string? Message);
 
 public sealed class OAuthRefreshRejectedException(int httpStatus, string? errorCode)
-    : Exception($"OAuth refresh отвергнут сервером (HTTP {httpStatus}, code={errorCode ?? "—"})")
+    : Exception($"OAuth refresh отвергнут сервером (HTTP {httpStatus}, code={errorCode ?? "–"})")
 {
     public int HttpStatus { get; } = httpStatus;
     public string? ErrorCode { get; } = errorCode;
+}
+
+public sealed class OAuthTokenRequestException(HttpStatusCode httpStatus, int oauthStatus, string? errorMessage)
+    : InvalidOperationException($"OAuth error {oauthStatus}: {errorMessage ?? "нет описания"}")
+{
+    public HttpStatusCode HttpStatus { get; } = httpStatus;
+    public int OAuthStatus { get; } = oauthStatus;
+    public string? ErrorMessage { get; } = errorMessage;
+
+    public bool IsCredentialsRejected => HttpStatus is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden;
 }
 
 internal sealed record ValidateResponse(

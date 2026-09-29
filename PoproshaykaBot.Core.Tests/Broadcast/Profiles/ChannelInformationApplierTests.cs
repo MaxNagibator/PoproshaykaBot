@@ -1,5 +1,6 @@
 ﻿using PoproshaykaBot.Core.Broadcast.Profiles;
 using PoproshaykaBot.Core.Infrastructure.Events;
+using PoproshaykaBot.Core.Tests.Debugging;
 using PoproshaykaBot.Core.Infrastructure.Events.Broadcasting;
 using PoproshaykaBot.Core.Twitch;
 using PoproshaykaBot.Core.Twitch.Helix;
@@ -20,7 +21,9 @@ public class ChannelInformationApplierTests
         _confirmation.AwaitAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
             .Returns(true);
 
-        _applier = new(_channelsApi, _idProvider, _confirmation, _eventBus,
+        _targetChannel = new();
+
+        _applier = new(_channelsApi, _idProvider, _targetChannel, _confirmation, _eventBus,
             NullLogger<ChannelInformationApplier>.Instance);
     }
 
@@ -28,6 +31,7 @@ public class ChannelInformationApplierTests
     private IBroadcasterIdProvider _idProvider = null!;
     private IEventBus _eventBus = null!;
     private IChannelUpdateConfirmation _confirmation = null!;
+    private FakeTargetChannelProvider _targetChannel = null!;
     private ChannelInformationApplier _applier = null!;
 
     [Test]
@@ -222,6 +226,25 @@ public class ChannelInformationApplierTests
         var result = await _applier.ApplyPatchAsync("Hello", null, null, CancellationToken.None);
 
         Assert.That(result, Is.True);
+    }
+
+    [Test]
+    public async Task ApplyPatchAsync_OnForeignChannel_RefusesWithoutCallingTwitch()
+    {
+        _targetChannel.IsDebugSession = true;
+        _targetChannel.Login = "someone-else";
+        _targetChannel.OwnChannel = "bobito217";
+
+        var result = await _applier.ApplyPatchAsync("Hello", null, null, CancellationToken.None);
+
+        Assert.That(result, Is.False);
+
+        await _channelsApi.DidNotReceiveWithAnyArgs()
+            .ModifyChannelInformationAsync(default!, default!, default);
+
+        await _eventBus.Received(1)
+            .PublishAsync(Arg.Is<ChannelInformationPatchFailed>(e => e.ErrorMessage.Contains("отладка", StringComparison.OrdinalIgnoreCase)),
+                Arg.Any<CancellationToken>());
     }
 
     [Test]

@@ -3,7 +3,7 @@
 namespace PoproshaykaBot.Core.Twitch.Helix;
 
 public sealed class HelixMessageDroppedException(string reasonCode, string reasonMessage)
-    : Exception($"Сообщение отклонено Twitch: {reasonCode} — {reasonMessage}")
+    : Exception($"Сообщение отклонено Twitch: {reasonCode} – {reasonMessage}")
 {
     public string ReasonCode { get; } = reasonCode;
     public string ReasonMessage { get; } = reasonMessage;

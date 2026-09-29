@@ -1,0 +1,97 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Tiles.StreamInfoTileView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Tiles"
+             xmlns:behaviors="clr-namespace:PoproshaykaBot.Wpf.Infrastructure.Behaviors"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:StreamInfoTileViewModel}"
+             d:DesignWidth="380">
+
+    <StackPanel>
+        <DockPanel LastChildFill="True"
+                   Margin="0,0,0,8">
+            <TextBlock DockPanel.Dock="Right"
+                       Style="{StaticResource TextBlock.Subtle}"
+                       FontSize="{DynamicResource Font.Size.XS}"
+                       VerticalAlignment="Center"
+                       Text="{Binding LastUpdated, StringFormat='HH:mm:ss'}" />
+            <Ellipse DockPanel.Dock="Left"
+                     Width="10"
+                     Height="10"
+                     Margin="0,0,8,0"
+                     VerticalAlignment="Center"
+                     behaviors:StreamStatusBrushBehavior.Fill="{Binding Status}" />
+            <TextBlock VerticalAlignment="Center"
+                       FontSize="{DynamicResource Font.Size.S}"
+                       FontWeight="SemiBold"
+                       behaviors:StreamStatusBrushBehavior.Foreground="{Binding Status}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="НЕИЗВЕСТНО" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Status}"
+                                         Value="Online">
+                                <Setter Property="Text" Value="В ЭФИРЕ" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Status}"
+                                         Value="Offline">
+                                <Setter Property="Text" Value="ОФЛАЙН" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </DockPanel>
+
+        <TextBlock Text="{Binding StreamTitle}"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource Fg.Primary}"
+                   FontSize="{DynamicResource Font.Size.M}"
+                   Margin="0,0,0,8" />
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Column="0"
+                        Grid.Row="0"
+                        Margin="0,0,8,8">
+                <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                           FontSize="{DynamicResource Font.Size.XS}"
+                           Text="Игра" />
+                <TextBlock Foreground="{DynamicResource Fg.Secondary}"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding Game}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        Grid.Row="0"
+                        Margin="0,0,0,8">
+                <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                           FontSize="{DynamicResource Font.Size.XS}"
+                           Text="Зрители" />
+                <TextBlock Foreground="{DynamicResource Fg.Secondary}"
+                           Text="{Binding ViewerCount, StringFormat=N0}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="0"
+                        Grid.Row="1"
+                        Margin="0,0,8,0">
+                <TextBlock Style="{StaticResource TextBlock.Subtle}"
+                           FontSize="{DynamicResource Font.Size.XS}"
+                           Text="Продолжительность" />
+                <TextBlock FontFamily="{DynamicResource Font.Mono}"
+                           Foreground="{DynamicResource Fg.Secondary}"
+                           Text="{Binding Uptime, Converter={StaticResource Timecode}}" />
+            </StackPanel>
+        </Grid>
+    </StackPanel>
+</UserControl>

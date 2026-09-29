@@ -49,27 +49,52 @@ public class GameCategoryResolverTests
         Assert.That(results[0].Id, Is.EqualTo("1"));
     }
 
-    [Test]
-    public async Task ResolveAsync_ReturnsFirstResult()
+    [TestCase("tarkov", "2")]
+    [TestCase("TARKOV", "2")]
+    [TestCase("escape tarkov", "2")]
+    [TestCase("tarot", "1")]
+    [TestCase("tarkov!", "2")]
+    [TestCase("tar", "1")]
+    [TestCase("Escape from Tarkov: Arena", "3")]
+    public async Task ResolveAsync_PicksMatchingName_NotFirstResult(string query, string expectedId)
     {
-        _searchApi.SearchCategoriesAsync("dota", 10, Arg.Any<CancellationToken>())
-            .Returns([new("1", "Dota 2", "")]);
+        _searchApi.SearchCategoriesAsync(query, 10, Arg.Any<CancellationToken>())
+            .Returns([
+                new("1", "Tarot", ""),
+                new("2", "Escape from Tarkov", ""),
+                new("3", "Escape from Tarkov: Arena", ""),
+            ]);
 
-        var result = await _resolver.ResolveAsync("dota", CancellationToken.None);
+        var result = await _resolver.ResolveAsync(query, CancellationToken.None);
 
-        Assert.That(result, Is.Not.Null);
-        Assert.That(result!.Id, Is.EqualTo("1"));
+        Assert.That(result.Match?.Id, Is.EqualTo(expectedId));
+        Assert.That(_store.Load().Select(x => x.Id), Is.EqualTo(new[] { expectedId }));
+    }
+
+    [TestCase("tarkov", "Tarot")]
+    [TestCase("tar", "StarCraft")]
+    public async Task ResolveAsync_NoNameMatches_ReturnsCandidatesWithoutMatchAndRemembersNothing(string query, string candidate)
+    {
+        _searchApi.SearchCategoriesAsync(query, 10, Arg.Any<CancellationToken>())
+            .Returns([new("1", candidate, "")]);
+
+        var result = await _resolver.ResolveAsync(query, CancellationToken.None);
+
+        Assert.That(result.Match, Is.Null);
+        Assert.That(result.Candidates.Select(x => x.Name), Is.EqualTo(new[] { candidate }));
+        Assert.That(_store.Load(), Is.Empty);
     }
 
     [Test]
-    public async Task ResolveAsync_NoResults_ReturnsNull()
+    public async Task ResolveAsync_NoResults_ReturnsNoMatch()
     {
         _searchApi.SearchCategoriesAsync("xxx", 10, Arg.Any<CancellationToken>())
             .Returns([]);
 
         var result = await _resolver.ResolveAsync("xxx", CancellationToken.None);
 
-        Assert.That(result, Is.Null);
+        Assert.That(result.Match, Is.Null);
+        Assert.That(result.Candidates, Is.Empty);
     }
 
     [Test]

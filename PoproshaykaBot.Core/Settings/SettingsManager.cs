@@ -4,7 +4,6 @@ using PoproshaykaBot.Core.Infrastructure.Persistence;
 using PoproshaykaBot.Core.Settings.Migrations;
 using PoproshaykaBot.Core.Settings.Stores;
 using PoproshaykaBot.Core.Users;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -14,19 +13,16 @@ public class SettingsManager
 {
     private readonly ILogger<SettingsManager> _logger;
     private readonly string _settingsFilePath;
+    private readonly JsonStore<AppSettings> _store;
     private readonly object _syncLock = new();
 
     private AppSettings? _currentSettings;
 
-    public SettingsManager(ILogger<SettingsManager> logger)
-        : this(logger, null)
-    {
-    }
-
-    public SettingsManager(ILogger<SettingsManager> logger, string? settingsFilePath)
+    public SettingsManager(ILogger<SettingsManager> logger, string? settingsFilePath = null, SettingsWriteGate? gate = null)
     {
         _logger = logger;
         _settingsFilePath = settingsFilePath ?? AppPaths.SettingsFile("settings.json");
+        _store = new(_settingsFilePath, logger, parser: ParseFile, describe: SettingsDescriber.Describe, gate: gate);
     }
 
     public virtual AppSettings Current
@@ -35,24 +31,26 @@ public class SettingsManager
         {
             lock (_syncLock)
             {
-                return _currentSettings ??= LoadSettingsInternal();
+                return _currentSettings ??= _store.Load();
             }
         }
     }
 
-    public virtual void SaveSettings(AppSettings settings)
+    public virtual bool SaveSettings(AppSettings settings)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
         _logger.LogDebug("Начало сохранения user-настроек в {SettingsFilePath}", _settingsFilePath);
 
         lock (_syncLock)
         {
             try
             {
-                var json = JsonSerializer.Serialize(settings, JsonStoreOptions.Default);
-                AtomicFile.Save(_settingsFilePath, json, _logger);
+                var written = _store.Save(settings);
+                _currentSettings = _store.Load();
+                LogApplied(written);
 
-                _currentSettings = settings;
-                _logger.LogInformation("User-настройки приложения успешно сохранены");
+                return written;
             }
             catch (Exception exception)
             {
@@ -62,9 +60,49 @@ public class SettingsManager
         }
     }
 
-    private static AppSettings CreateDefaultSettings()
+    public virtual bool Mutate(Action<AppSettings> mutator)
     {
-        return new();
+        ArgumentNullException.ThrowIfNull(mutator);
+
+        lock (_syncLock)
+        {
+            try
+            {
+                var written = _store.Mutate(mutator);
+                _currentSettings = _store.Load();
+                LogApplied(written);
+
+                return written;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Критическая ошибка при сохранении настроек в {SettingsFilePath}", _settingsFilePath);
+                throw new InvalidOperationException($"Ошибка сохранения настроек: {exception.Message}", exception);
+            }
+        }
+    }
+
+    public virtual void UpdateCurrent(Action<AppSettings> mutator)
+    {
+        ArgumentNullException.ThrowIfNull(mutator);
+
+        lock (_syncLock)
+        {
+            mutator(_currentSettings ??= _store.Load());
+            _logger.LogDebug("Настройки изменены только в памяти, файл {SettingsFilePath} не тронут", _settingsFilePath);
+        }
+    }
+
+    private void LogApplied(bool written)
+    {
+        if (written)
+        {
+            _logger.LogInformation("User-настройки приложения сохранены");
+            return;
+        }
+
+        _logger.LogInformation("User-настройки приложения приняты в памяти и действуют до перезапуска: файл {SettingsFilePath} переписан снаружи, и класть поверх него прочитанное раньше нельзя",
+            _settingsFilePath);
     }
 
     private void SanitizeRanks(AppSettings settings)
@@ -74,7 +112,7 @@ public class SettingsManager
         if (ranks.Count == 0)
         {
             settings.Ranks.Ranks = new RanksSettings().Ranks;
-            _logger.LogWarning("Раздел ranks был пустой — восстановлены значения по умолчанию");
+            _logger.LogWarning("Раздел ranks был пустой – восстановлены значения по умолчанию");
             return;
         }
 
@@ -87,59 +125,38 @@ public class SettingsManager
         }
 
         settings.Ranks.Ranks = new RanksSettings().Ranks;
-        _logger.LogWarning("В разделе ranks обнаружены повреждённые записи (null emoji/name) — список рангов восстановлен из дефолтов");
+        _logger.LogWarning("В разделе ranks обнаружены повреждённые записи (null emoji/name) – список рангов восстановлен из дефолтов");
     }
 
-    private AppSettings LoadSettingsInternal()
+    private AppSettings ParseFile(string json)
     {
-        _logger.LogDebug("Начало загрузки настроек из {SettingsFilePath}", _settingsFilePath);
+        var node = JsonNode.Parse(json);
 
-        try
+        if (node is not JsonObject root)
         {
-            if (!File.Exists(_settingsFilePath))
-            {
-                _logger.LogInformation("Файл настроек {SettingsFilePath} не найден. Применяются настройки по умолчанию", _settingsFilePath);
-                return CreateDefaultSettings();
-            }
-
-            var json = File.ReadAllText(_settingsFilePath, Encoding.UTF8);
-            var node = JsonNode.Parse(json);
-
-            if (node is not JsonObject root)
-            {
-                throw new InvalidOperationException("Корневой элемент settings.json не является JSON-объектом");
-            }
-
-            var baseDirectory = Path.GetDirectoryName(_settingsFilePath)!;
-
-            if (SettingsMigrator.TryMigrate(root, _logger, baseDirectory))
-            {
-                JsonStoreBackup.CreateBackup(_settingsFilePath, "pre-migration", _logger);
-                var migratedJson = root.ToJsonString(JsonStoreOptions.Default);
-                AtomicFile.Save(_settingsFilePath, migratedJson, _logger);
-                _logger.LogInformation("Настройки мигрированы в актуальный формат и сохранены");
-            }
-
-            var settings = root.Deserialize<AppSettings>(JsonStoreOptions.Default);
-
-            if (settings == null)
-            {
-                throw new InvalidOperationException("Не удалось десериализовать настройки (null)");
-            }
-
-            SanitizeRanks(settings);
-
-            _logger.LogInformation("Настройки приложения успешно загружены");
-            return settings;
+            throw new InvalidOperationException("Корневой элемент settings.json не является JSON-объектом");
         }
-        catch (Exception exception)
+
+        var baseDirectory = Path.GetDirectoryName(_settingsFilePath)!;
+
+        if (SettingsMigrator.Migrate(root, _logger, baseDirectory).Changed)
         {
-            _logger.LogError(exception, "Ошибка загрузки или десериализации настроек из файла {SettingsFilePath}", _settingsFilePath);
-
-            JsonStoreBackup.CreateBackup(_settingsFilePath, "invalid", _logger);
-
-            _logger.LogWarning("Из-за ошибки загрузки применяются настройки по умолчанию");
-            return CreateDefaultSettings();
+            JsonStoreBackup.CreateBackup(_settingsFilePath, "pre-migration", _logger, AccountsTokenRedactor.Redact);
+            var migratedJson = root.ToJsonString(JsonStoreOptions.Default);
+            AtomicFile.Save(_settingsFilePath, migratedJson, _logger, keepBackup: false);
+            _logger.LogInformation("Настройки мигрированы в актуальный формат и сохранены");
         }
+
+        var settings = root.Deserialize<AppSettings>(JsonStoreOptions.Default);
+
+        if (settings == null)
+        {
+            throw new InvalidOperationException("Не удалось десериализовать настройки (null)");
+        }
+
+        SanitizeRanks(settings);
+
+        _logger.LogInformation("Настройки приложения загружены");
+        return settings;
     }
 }

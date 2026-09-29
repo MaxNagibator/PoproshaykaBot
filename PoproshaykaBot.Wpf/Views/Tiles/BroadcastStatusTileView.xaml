@@ -1,0 +1,91 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Tiles.BroadcastStatusTileView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Tiles"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:BroadcastStatusTileViewModel}"
+             d:DesignWidth="380">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid.Resources>
+            <Style x:Key="Label"
+                   TargetType="TextBlock">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Fg.Muted}" />
+                <Setter Property="FontSize"
+                        Value="{DynamicResource Font.Size.S}" />
+                <Setter Property="VerticalAlignment"
+                        Value="Center" />
+                <Setter Property="Margin"
+                        Value="0,0,10,4" />
+            </Style>
+            <Style x:Key="Value"
+                   TargetType="TextBlock">
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Fg.Primary}" />
+                <Setter Property="FontSize"
+                        Value="{DynamicResource Font.Size.S}" />
+                <Setter Property="VerticalAlignment"
+                        Value="Center" />
+                <Setter Property="Margin"
+                        Value="0,0,0,4" />
+            </Style>
+        </Grid.Resources>
+
+        <TextBlock Grid.Row="0"
+                   Grid.Column="0"
+                   Style="{StaticResource Label}"
+                   Text="Статус" />
+        <TextBlock Grid.Row="0"
+                   Grid.Column="1"
+                   Style="{StaticResource Value}"
+                   Text="{Binding StatusText}"
+                   FontSize="{DynamicResource Font.Size.M}"
+                   FontWeight="SemiBold"
+                   keepshell:SeverityBrushBehavior.Foreground="{Binding StatusSeverity}" />
+
+        <TextBlock Grid.Row="1"
+                   Grid.Column="0"
+                   Style="{StaticResource Label}"
+                   Text="Режим" />
+        <TextBlock Grid.Row="1"
+                   Grid.Column="1"
+                   Style="{StaticResource Value}"
+                   Text="{Binding ModeText}" />
+
+        <TextBlock Grid.Row="2"
+                   Grid.Column="0"
+                   Style="{StaticResource Label}"
+                   Text="Отправлено" />
+        <TextBlock Grid.Row="2"
+                   Grid.Column="1"
+                   Style="{StaticResource Value}"
+                   Text="{Binding SentCount}" />
+
+        <TextBlock Grid.Row="3"
+                   Grid.Column="0"
+                   Style="{StaticResource Label}"
+                   Text="Следующая"
+                   Margin="0,0,10,0" />
+        <TextBlock Grid.Row="3"
+                   Grid.Column="1"
+                   Style="{StaticResource Value}"
+                   Text="{Binding NextBroadcastText}"
+                   FontFamily="{DynamicResource Font.Mono}"
+                   Margin="0" />
+    </Grid>
+</UserControl>

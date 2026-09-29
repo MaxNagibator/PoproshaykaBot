@@ -29,6 +29,9 @@ public static class ObsChatRanges
     public const int UserAvatarSizeMin = 16;
     public const int UserAvatarSizeMax = 96;
 
+    public const int MessageImageMaxHeightMin = 40;
+    public const int MessageImageMaxHeightMax = 720;
+
     public const int MessageLifetimeMin = 1;
     public const int MessageLifetimeMax = 3600;
 

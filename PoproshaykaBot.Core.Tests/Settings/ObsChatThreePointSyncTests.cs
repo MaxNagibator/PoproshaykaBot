@@ -23,7 +23,7 @@ public sealed class ObsChatThreePointSyncTests
         var mutatedCss = ObsChatCssSettings.FromObsChatSettings(mutated);
 
         Assert.That(AreEqual(defaultCss, mutatedCss), Is.False,
-            $"Изменение ObsChatSettings.{sourceProp.Name} не повлияло на ObsChatCssSettings — "
+            $"Изменение ObsChatSettings.{sourceProp.Name} не повлияло на ObsChatCssSettings – "
             + "пропустили шаг (1) three-point sync в FromObsChatSettings.");
     }
 
@@ -36,7 +36,7 @@ public sealed class ObsChatThreePointSyncTests
         var camelCase = ToCamelCase(cssProp.Name);
 
         Assert.That(jsSource, Does.Contain(camelCase),
-            $"Поле ObsChatCssSettings.{cssProp.Name} (JSON: {camelCase}) не используется в obs.js — "
+            $"Поле ObsChatCssSettings.{cssProp.Name} (JSON: {camelCase}) не используется в obs.js – "
             + "пропустили шаг (2) three-point sync.");
     }
 
@@ -73,7 +73,7 @@ public sealed class ObsChatThreePointSyncTests
 
         if (!match.Success)
         {
-            throw new InvalidOperationException($"Не нашли массив '{variableName}' в obs.js. Возможно, его переименовали — "
+            throw new InvalidOperationException($"Не нашли массив '{variableName}' в obs.js. Возможно, его переименовали – "
                                                 + "обновите тест или верните прежнее имя.");
         }
 
@@ -82,11 +82,31 @@ public sealed class ObsChatThreePointSyncTests
             .ToArray();
     }
 
+    private static readonly string[] ServerOnlyProperties =
+    [
+        nameof(ObsChatSettings.MessageImageRoles),
+        nameof(ObsChatSettings.MessageImageAllowedHosts),
+    ];
+
+    [Test]
+    public void ServerOnlyObsChatSettingsFields_StayOutOfObsChatCssSettings()
+    {
+        var cssNames = GetCssTargetProperties().Select(p => p.Name).ToArray();
+
+        foreach (var name in ServerOnlyProperties)
+        {
+            Assert.That(cssNames, Does.Not.Contain(name),
+                $"ObsChatSettings.{name} – политика картинок, её решает Core. "
+                + "В браузер она не отдаётся, иначе белый список и роли уезжают на страницу оверлея.");
+        }
+    }
+
     private static IEnumerable<PropertyInfo> GetMutableSourceProperties()
     {
         return typeof(ObsChatSettings)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p is { CanRead: true, CanWrite: true });
+            .Where(p => p is { CanRead: true, CanWrite: true })
+            .Where(p => !ServerOnlyProperties.Contains(p.Name, StringComparer.Ordinal));
     }
 
     private static IEnumerable<PropertyInfo> GetCssTargetProperties()

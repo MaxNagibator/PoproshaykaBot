@@ -1,0 +1,1982 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.StreamHistoryPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels"
+             xmlns:infrastructure="clr-namespace:PoproshaykaBot.Wpf.Infrastructure"
+             xmlns:views="clr-namespace:PoproshaykaBot.Wpf.Views"
+             xmlns:controls="clr-namespace:KeepShell.Views.Controls;assembly=KeepShell"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:StreamHistoryPageViewModel}"
+             d:DesignHeight="720"
+             d:DesignWidth="1100">
+
+    <UserControl.Resources>
+
+        <Style x:Key="BoxArtSlot"
+               TargetType="Border">
+            <Setter Property="Width"
+                    Value="24" />
+            <Setter Property="Height"
+                    Value="32" />
+            <Setter Property="CornerRadius"
+                    Value="3" />
+            <Setter Property="Background"
+                    Value="{DynamicResource Bg.SurfaceMute}" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Border.Default}" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="ClipToBounds"
+                    Value="True" />
+            <Setter Property="SnapsToDevicePixels"
+                    Value="True" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Visibility"
+                    Value="{Binding HasImage, Converter={StaticResource BoolToVisibility}}" />
+        </Style>
+
+        <Style x:Key="BoxArtSlot.Large"
+               TargetType="Border"
+               BasedOn="{StaticResource BoxArtSlot}">
+            <Setter Property="Width"
+                    Value="52" />
+            <Setter Property="Height"
+                    Value="72" />
+            <Setter Property="CornerRadius"
+                    Value="4" />
+            <Setter Property="VerticalAlignment"
+                    Value="Top" />
+        </Style>
+
+        <Style x:Key="BoxArtImage"
+               TargetType="Image">
+            <Setter Property="Stretch"
+                    Value="UniformToFill" />
+            <Setter Property="Visibility"
+                    Value="{Binding HasImage, Converter={StaticResource BoolToVisibility}}" />
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding AutomationName}" />
+        </Style>
+
+        <DataTemplate x:Key="BoxArtThumb">
+            <Border Style="{StaticResource BoxArtSlot}">
+                <Image Style="{StaticResource BoxArtImage}"
+                       Source="{Binding Image}" />
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="BoxArtCover">
+            <Border Style="{StaticResource BoxArtSlot.Large}">
+                <Image Style="{StaticResource BoxArtImage}"
+                       Source="{Binding Image}" />
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="GameCell">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <ContentPresenter Grid.Column="0"
+                                  Content="{Binding BoxArt}"
+                                  ContentTemplate="{StaticResource BoxArtThumb}" />
+
+                <TextBlock Grid.Column="1"
+                           Style="{StaticResource EllipsisCell}"
+                           Margin="8,0,0,0"
+                           Text="{Binding GameCellText}" />
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="DeltaText"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Setter Property="TextWrapping"
+                    Value="NoWrap" />
+            <Setter Property="Margin"
+                    Value="0,2,0,0" />
+            <Style.Triggers>
+                <Trigger Property="Tag"
+                         Value="{x:Static vm:TrendTone.Up}">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.SuccessText}" />
+                </Trigger>
+                <Trigger Property="Tag"
+                         Value="{x:Static vm:TrendTone.Down}">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.ErrorText}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DeltaCell"
+               TargetType="StackPanel">
+            <Setter Property="Margin"
+                    Value="0,0,24,4" />
+        </Style>
+
+        <Style x:Key="TrendDate"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Muted}" />
+            <Setter Property="TextWrapping"
+                    Value="NoWrap" />
+        </Style>
+
+        <Style x:Key="TrendBar"
+               TargetType="Button">
+            <Setter Property="Background"
+                    Value="{DynamicResource Accent.Soft}" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Margin"
+                    Value="1,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Background="Transparent">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="{Binding RestTrack}" />
+                                <RowDefinition Height="{Binding FillTrack}" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock x:Name="Value"
+                                       Grid.Row="0"
+                                       Text="{Binding ValueText}"
+                                       FontSize="{DynamicResource Font.Size.Caption}"
+                                       Foreground="{DynamicResource Fg.Secondary}"
+                                       TextWrapping="NoWrap"
+                                       HorizontalAlignment="Center"
+                                       Margin="{x:Static views:StreamHistoryPageView.TrendValueMargin}"
+                                       Visibility="Hidden" />
+
+                            <Border Grid.Row="1"
+                                    Grid.RowSpan="2"
+                                    Background="{DynamicResource Bg.SurfaceMute}"
+                                    CornerRadius="2" />
+
+                            <Border x:Name="Fill"
+                                    Grid.Row="2"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0"
+                                    CornerRadius="2,2,0,0" />
+
+                            <Border x:Name="Break"
+                                    Grid.Row="2"
+                                    Height="2"
+                                    Margin="0,4,0,0"
+                                    VerticalAlignment="Top"
+                                    Background="{DynamicResource Bg.Surface}"
+                                    Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsClipped}"
+                                         Value="True">
+                                <Setter TargetName="Break"
+                                        Property="Visibility"
+                                        Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsPeak}"
+                                         Value="True">
+                                <Setter TargetName="Value"
+                                        Property="Visibility"
+                                        Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsSelected}"
+                                         Value="True">
+                                <Setter TargetName="Value"
+                                        Property="Visibility"
+                                        Value="Visible" />
+                                <Setter TargetName="Value"
+                                        Property="Foreground"
+                                        Value="{DynamicResource Accent.Text}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsFirst}"
+                                         Value="True">
+                                <Setter TargetName="Value"
+                                        Property="HorizontalAlignment"
+                                        Value="Left" />
+                                <Setter TargetName="Value"
+                                        Property="Margin"
+                                        Value="{x:Static views:StreamHistoryPageView.TrendValueFirstMargin}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsLast}"
+                                         Value="True">
+                                <Setter TargetName="Value"
+                                        Property="HorizontalAlignment"
+                                        Value="Right" />
+                                <Setter TargetName="Value"
+                                        Property="Margin"
+                                        Value="{x:Static views:StreamHistoryPageView.TrendValueLastMargin}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding DataContext.IsCompactLayout, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                         Value="True">
+                                <Setter TargetName="Value"
+                                        Property="Visibility"
+                                        Value="Collapsed" />
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Fill"
+                                        Property="Background"
+                                        Value="{DynamicResource Accent.PrimaryHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused"
+                                     Value="True">
+                                <Setter TargetName="Fill"
+                                        Property="BorderThickness"
+                                        Value="1" />
+                                <Setter TargetName="Fill"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Fg.Primary}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Accent.Primary}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TrendOptionItem"
+               TargetType="MenuItem"
+               BasedOn="{StaticResource {x:Type MenuItem}}">
+            <Setter Property="Command"
+                    Value="{Binding Command}" />
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <iconPacks:PackIconLucide Grid.Column="0"
+                                                      Kind="Check"
+                                                      Width="12"
+                                                      Height="12"
+                                                      VerticalAlignment="Center"
+                                                      Visibility="{Binding IsChecked, Converter={StaticResource BoolToVisibility}}" />
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Caption}" />
+                        </Grid>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SegmentBlock"
+               TargetType="Border">
+            <Setter Property="CornerRadius"
+                    Value="3" />
+            <Setter Property="Padding"
+                    Value="6,0" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Border.Strong}" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Background"
+                    Value="{DynamicResource Bg.SurfaceMute}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="0">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Accent.Soft}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="1">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.InfoSoft}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="2">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.SuccessSoft}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="3">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.WarningSoft}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="4">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.ErrorSoft}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ContinuesGame}"
+                             Value="True">
+                    <Setter Property="BorderThickness"
+                            Value="2,0,0,0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SegmentCaption"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="TextWrapping"
+                    Value="NoWrap" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Secondary}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="0">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Accent.Text}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="1">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.InfoText}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="2">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.SuccessText}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="3">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.WarningText}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="4">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource State.ErrorText}" />
+                </DataTrigger>
+                <DataTrigger Value="False"
+                             Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Border}, Converter={StaticResource ScaledWidthFits}, ConverterParameter=56}">
+                    <Setter Property="Visibility"
+                            Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <ContextMenu x:Key="SessionRowMenu"
+                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+            <MenuItem Header="Копировать строку"
+                      Command="ApplicationCommands.Copy"
+                      CommandParameter="{Binding}"
+                      CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type ContextMenu}}}" />
+            <MenuItem Header="{Binding HiddenMenuCaption}"
+                      Click="OnSessionHiddenClick" />
+        </ContextMenu>
+
+        <Style x:Key="SessionRow"
+               TargetType="ListBoxItem"
+               BasedOn="{StaticResource TableListRow}">
+            <Setter Property="ContextMenu"
+                    Value="{StaticResource SessionRowMenu}" />
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding CardSummary}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsHidden}"
+                             Value="True">
+                    <Setter Property="Opacity"
+                            Value="0.55" />
+                    <Setter Property="ToolTip"
+                            Value="{Binding HiddenHint}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate x:Key="SessionRowTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="StreamStart" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="StreamDuration" />
+                    <ColumnDefinition Width="2*"
+                                      MinWidth="72" />
+                    <ColumnDefinition Width="*"
+                                      MinWidth="72"
+                                      MaxWidth="260" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="StreamMessages" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="StreamChatters" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="StreamPeak" />
+                    <ColumnDefinition Width="Auto"
+                                      SharedSizeGroup="StreamAverage" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Style="{StaticResource MonoCell}"
+                           Margin="10,0,10,0"
+                           Text="{Binding StartedAtFormatted}" />
+
+                <TextBlock Grid.Column="1"
+                           Style="{StaticResource RightCell}"
+                           Margin="10,0,8,0"
+                           Text="{Binding DurationFormatted}" />
+
+                <TextBlock Grid.Column="2"
+                           Style="{StaticResource EllipsisCell}"
+                           Margin="10,0,10,0"
+                           Text="{Binding TitleFormatted}" />
+
+                <ContentPresenter Grid.Column="3"
+                                  Margin="10,0,10,0"
+                                  VerticalAlignment="Center"
+                                  Content="{Binding}"
+                                  ContentTemplate="{StaticResource GameCell}" />
+
+                <TextBlock Grid.Column="4"
+                           Style="{StaticResource NumericCell}"
+                           Margin="10,0,8,0"
+                           Text="{Binding MessageCountFormatted}" />
+
+                <TextBlock Grid.Column="5"
+                           Style="{StaticResource NumericCell}"
+                           Margin="10,0,8,0"
+                           Text="{Binding ChatterCountFormatted}" />
+
+                <TextBlock Grid.Column="6"
+                           Style="{StaticResource NumericCell}"
+                           Margin="10,0,8,0"
+                           Text="{Binding PeakViewersFormatted}" />
+
+                <TextBlock Grid.Column="7"
+                           Style="{StaticResource NumericCell}"
+                           Margin="10,0,8,0"
+                           Text="{Binding AverageViewersFormatted}" />
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="SessionCardStripe"
+               TargetType="Border">
+            <Setter Property="CornerRadius"
+                    Value="2" />
+            <Setter Property="Background"
+                    Value="{DynamicResource Bg.SurfaceMute}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="0">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Accent.Primary}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="1">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.InfoText}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="2">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.SuccessText}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="3">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.WarningText}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PaletteIndex}"
+                             Value="4">
+                    <Setter Property="Background"
+                            Value="{DynamicResource State.ErrorText}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SessionCardTitle"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.S}" />
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource Font.Weight.SemiBold}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Primary}" />
+            <Setter Property="TextWrapping"
+                    Value="NoWrap" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+        </Style>
+
+        <ContextMenu x:Key="SegmentRowMenu"
+                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+            <MenuItem Header="{Binding FilterCaption}"
+                      Click="OnSegmentFilterClick" />
+        </ContextMenu>
+
+        <Style x:Key="SegmentCardItem"
+               TargetType="ListBoxItem"
+               BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch" />
+            <Setter Property="VerticalContentAlignment"
+                    Value="Stretch" />
+            <Setter Property="Padding"
+                    Value="8" />
+            <Setter Property="Margin"
+                    Value="0,0,8,8" />
+            <Setter Property="ToolTip"
+                    Value="{Binding TimelineText}" />
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding TimelineText}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{DynamicResource Bg.SurfaceAlt}"
+                                BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="1"
+                                CornerRadius="{DynamicResource Radius.M}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource Bg.SurfaceMute}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected"
+                                     Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource Accent.Soft}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin"
+                                     Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Accent.Primary}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CanFilter}"
+                             Value="True">
+                    <Setter Property="ContextMenu"
+                            Value="{StaticResource SegmentRowMenu}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SegmentMetric"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{DynamicResource Font.Size.Caption}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Fg.Secondary}" />
+            <Setter Property="TextWrapping"
+                    Value="NoWrap" />
+            <Setter Property="Margin"
+                    Value="0,4,12,0" />
+        </Style>
+
+        <DataTemplate x:Key="SegmentCardTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*"
+                                      MinWidth="60" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Style="{StaticResource SessionCardStripe}"
+                        Width="3"
+                        Margin="0,0,8,0" />
+
+                <ContentPresenter Grid.Column="1"
+                                  VerticalAlignment="Top"
+                                  Content="{Binding BoxArt}"
+                                  ContentTemplate="{StaticResource BoxArtThumb}" />
+
+                <Grid Grid.Column="2"
+                      Margin="8,0,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"
+                                          MinWidth="50" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="0"
+                               Style="{StaticResource SessionCardTitle}"
+                               Text="{Binding Game}" />
+
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="1"
+                               Style="{StaticResource RatingNumber.Strong}"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Top"
+                               Text="{Binding Duration}" />
+
+                    <TextBlock Grid.Row="1"
+                               Grid.Column="0"
+                               Grid.ColumnSpan="2"
+                               Style="{StaticResource StatLabel}"
+                               Margin="0,1,0,0"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Title}" />
+
+                    <WrapPanel Grid.Row="2"
+                               Grid.Column="0"
+                               Grid.ColumnSpan="2"
+                               Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource SegmentMetric}"
+                                   Text="{Binding MessagesText}" />
+                        <TextBlock Style="{StaticResource SegmentMetric}"
+                                   Text="{Binding PeakViewersText}" />
+                        <TextBlock Style="{StaticResource SegmentMetric}"
+                                   Margin="0,4,0,0"
+                                   Text="{Binding AverageViewersText}" />
+                    </WrapPanel>
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="ChatterRowItem"
+               TargetType="ListBoxItem"
+               BasedOn="{StaticResource RatingRowItem}">
+            <Setter Property="ToolTip"
+                    Value="{Binding Hint}" />
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding Hint}" />
+            <EventSetter Event="MouseLeftButtonUp"
+                         Handler="OnChatterRowActivated" />
+            <EventSetter Event="KeyDown"
+                         Handler="OnChatterRowKeyDown" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CanOpen}"
+                             Value="True">
+                    <Setter Property="Cursor"
+                            Value="Hand" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate x:Key="ChatterRowTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*"
+                                      MinWidth="60" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ContentPresenter Grid.Column="0"
+                                  Content="{Binding}"
+                                  ContentTemplate="{StaticResource RatingPositionCell}" />
+
+                <TextBlock Grid.Column="1"
+                           Style="{StaticResource RatingName}"
+                           Text="{Binding DisplayName}"
+                           Margin="10,0,10,0" />
+
+                <TextBlock Grid.Column="2"
+                           Style="{StaticResource RatingNumber.Strong}"
+                           Text="{Binding MessageCountFormatted}" />
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="SummaryChevron"
+               TargetType="iconPacks:PackIconLucide">
+            <Setter Property="Kind"
+                    Value="ChevronRight" />
+            <Setter Property="Width"
+                    Value="12" />
+            <Setter Property="Height"
+                    Value="12" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSummaryExpanded}"
+                             Value="True">
+                    <Setter Property="Kind"
+                            Value="ChevronDown" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CategoryRowItem"
+               TargetType="ListBoxItem"
+               BasedOn="{StaticResource RatingRowItem}">
+            <Setter Property="MinHeight"
+                    Value="32" />
+            <Setter Property="Padding"
+                    Value="8,0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <EventSetter Event="MouseLeftButtonUp"
+                         Handler="OnCategoryRowActivated" />
+            <EventSetter Event="KeyDown"
+                         Handler="OnCategoryRowKeyDown" />
+        </Style>
+
+        <DataTemplate x:Key="CategoryRowTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*"
+                                      MinWidth="60" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ContentPresenter Grid.Column="0"
+                                  Content="{Binding}"
+                                  ContentTemplate="{StaticResource RatingPositionCell}" />
+
+                <Grid Grid.Column="1"
+                      Margin="10,0,10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ContentPresenter Grid.Column="0"
+                                      Content="{Binding BoxArt}"
+                                      ContentTemplate="{StaticResource BoxArtThumb}" />
+
+                    <TextBlock Grid.Column="1"
+                               Style="{StaticResource RatingName}"
+                               Margin="8,0,0,0"
+                               Text="{Binding Game}" />
+                </Grid>
+
+                <TextBlock Grid.Column="2"
+                           Style="{StaticResource RatingNumber}"
+                           Text="{Binding SessionsText}"
+                           Margin="0,0,12,0" />
+
+                <TextBlock Grid.Column="3"
+                           Style="{StaticResource RatingNumber.Strong}"
+                           MinWidth="76"
+                           Text="{Binding AirTimeText}" />
+
+                <TextBlock Grid.Column="4"
+                           Style="{StaticResource RatingNumber}"
+                           MinWidth="44"
+                           Margin="10,0,0,0"
+                           Text="{Binding ShareText}" />
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="SessionCardItem"
+               TargetType="ListBoxItem"
+               BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch" />
+            <Setter Property="VerticalContentAlignment"
+                    Value="Stretch" />
+            <Setter Property="Padding"
+                    Value="12,8" />
+            <Setter Property="Margin"
+                    Value="0" />
+            <Setter Property="MinHeight"
+                    Value="{x:Static views:StreamHistoryPageView.CardHeight}" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Border.Subtle}" />
+            <Setter Property="BorderThickness"
+                    Value="0,0,0,1" />
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding CardSummary}" />
+            <Setter Property="ToolTip"
+                    Value="{Binding CardSummary}" />
+            <Setter Property="ContextMenu"
+                    Value="{StaticResource SessionRowMenu}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsCompactLayout, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                             Value="True">
+                    <Setter Property="MinHeight"
+                            Value="{x:Static views:StreamHistoryPageView.CardCompactHeight}" />
+                    <Setter Property="Padding"
+                            Value="12,6" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsHidden}"
+                             Value="True">
+                    <Setter Property="Opacity"
+                            Value="0.55" />
+                    <Setter Property="ToolTip"
+                            Value="{Binding HiddenHint}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate x:Key="SessionCardTemplate">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*"
+                                      MinWidth="120" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ContentPresenter x:Name="CardCover"
+                                  Grid.Row="0"
+                                  Grid.Column="0"
+                                  Content="{Binding BoxArt}"
+                                  ContentTemplate="{StaticResource BoxArtCover}" />
+
+                <StackPanel Grid.Row="0"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Margin="12,0,16,0">
+                    <TextBlock Style="{StaticResource SessionCardTitle}"
+                               Text="{Binding TitleFormatted}" />
+
+                    <TextBlock Style="{StaticResource StatLabel}"
+                               Text="{Binding CardMetaText}" />
+
+                    <TextBlock Style="{StaticResource StatLabel}"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding GameFormatted}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="0"
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <StackPanel MinWidth="72"
+                                Margin="0,0,20,0">
+                        <TextBlock Style="{StaticResource StatValue.Small}"
+                                   Text="{Binding MessageCountFormatted}" />
+                        <TextBlock Style="{StaticResource StatLabel}"
+                                   Text="сообщений" />
+                        <TextBlock Style="{StaticResource DeltaText}"
+                                   Tag="{Binding MessagesDeltaTone}"
+                                   Text="{Binding MessagesDelta}" />
+                    </StackPanel>
+
+                    <StackPanel MinWidth="72"
+                                Margin="0,0,20,0">
+                        <TextBlock Style="{StaticResource StatValue.Small}"
+                                   Text="{Binding ChatterCountFormatted}" />
+                        <TextBlock Style="{StaticResource StatLabel}"
+                                   Text="чаттеров" />
+                        <TextBlock Style="{StaticResource DeltaText}"
+                                   Tag="{Binding ChattersDeltaTone}"
+                                   Text="{Binding ChattersDelta}" />
+                    </StackPanel>
+
+                    <StackPanel MinWidth="72"
+                                Margin="0,0,20,0">
+                        <TextBlock Style="{StaticResource StatValue.Small}"
+                                   Text="{Binding PeakViewersFormatted}" />
+                        <TextBlock Style="{StaticResource StatLabel}"
+                                   Text="пик зрителей" />
+                        <TextBlock Style="{StaticResource DeltaText}"
+                                   Tag="{Binding PeakViewersDeltaTone}"
+                                   Text="{Binding PeakViewersDelta}" />
+                    </StackPanel>
+
+                    <StackPanel MinWidth="72">
+                        <TextBlock Style="{StaticResource StatValue.Small}"
+                                   Text="{Binding AverageViewersFormatted}" />
+                        <TextBlock Style="{StaticResource StatLabel}"
+                                   Text="средние зрители" />
+                        <TextBlock Style="{StaticResource DeltaText}"
+                                   Tag="{Binding AverageViewersDeltaTone}"
+                                   Text="{Binding AverageViewersDelta}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <ItemsControl x:Name="CardStripes"
+                              Grid.Row="1"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="3"
+                              Height="6"
+                              Margin="0,8,0,0"
+                              Focusable="False"
+                              IsHitTestVisible="False"
+                              ItemsSource="{Binding Stripes}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <infrastructure:ProportionalPanel Gap="2" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="infrastructure:ProportionalPanel.Share"
+                                    Value="{Binding Share}" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource SessionCardStripe}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsCompactLayout, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                             Value="True">
+                    <Setter TargetName="CardCover"
+                            Property="ContentTemplate"
+                            Value="{StaticResource BoxArtThumb}" />
+                    <Setter TargetName="CardStripes"
+                            Property="Visibility"
+                            Value="Collapsed" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <Style x:Key="RecordCard"
+               TargetType="Button"
+               BasedOn="{StaticResource Button.Ghost}">
+            <Setter Property="MinWidth"
+                    Value="{Binding ScaledRecordCardMinWidth, RelativeSource={RelativeSource AncestorType=views:StreamHistoryPageView}}" />
+            <Setter Property="Margin"
+                    Value="0,0,8,8" />
+            <Setter Property="Padding"
+                    Value="10,6" />
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Border.Subtle}" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="ToolTip"
+                    Value="{Binding Summary}" />
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding Summary}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource Radius.M}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource Bg.SurfaceAlt}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource Bg.SurfaceMute}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter Property="Opacity"
+                                        Value="0.5" />
+                                <Setter Property="Cursor"
+                                        Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CanSelect}"
+                             Value="False">
+                    <Setter Property="IsEnabled"
+                            Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+    </UserControl.Resources>
+
+    <Grid x:Name="PageGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="3*"
+                           MinHeight="160" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="2*"
+                           MinHeight="200" />
+        </Grid.RowDefinitions>
+
+        <StackPanel x:Name="HeaderStack"
+                    Grid.Row="0">
+
+        <DockPanel x:Name="SummaryBar"
+                   LastChildFill="True"
+                   Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left"
+                    Style="{StaticResource Button.Ghost}"
+                    Command="{Binding ToggleSummaryCommand}"
+                    VerticalAlignment="Center"
+                    Padding="8,4"
+                    AutomationProperties.Name="{Binding SummaryToggleCaption}"
+                    ToolTip="{Binding SummaryToggleCaption}"
+                    Visibility="{Binding HasSummaryStrip, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Style="{StaticResource SummaryChevron}" />
+
+                    <TextBlock Text="Сводка"
+                               FontSize="{DynamicResource Font.Size.S}"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="8,0,0,0">
+                <RadioButton Style="{StaticResource ToggleButton.Toolbar}"
+                             GroupName="StreamListView"
+                             IsChecked="{Binding IsTableView, Mode=TwoWay}"
+                             AutomationProperties.Name="Показать стримы таблицей"
+                             ToolTip="Показать стримы таблицей">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="Table"
+                                                  Width="13"
+                                                  Height="13"
+                                                  VerticalAlignment="Center" />
+                        <TextBlock Text="Таблица"
+                                   Margin="6,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton Style="{StaticResource ToggleButton.Toolbar}"
+                             GroupName="StreamListView"
+                             Margin="4,0,0,0"
+                             IsChecked="{Binding IsCardsView, Mode=TwoWay}"
+                             AutomationProperties.Name="Показать стримы карточками"
+                             ToolTip="Показать стримы карточками">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Kind="LayoutList"
+                                                  Width="13"
+                                                  Height="13"
+                                                  VerticalAlignment="Center" />
+                        <TextBlock Text="Карточки"
+                                   Margin="6,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+
+            <Button DockPanel.Dock="Right"
+                    x:Name="SortMenuButton"
+                    Style="{StaticResource Button.Icon}"
+                    Click="OnSortMenuClick"
+                    VerticalAlignment="Center"
+                    Margin="6,0,0,0"
+                    AutomationProperties.Name="{Binding SortCaption}"
+                    ToolTip="{Binding SortCaption}"
+                    Visibility="{Binding IsCardsView, Converter={StaticResource BoolToVisibility}}">
+                <iconPacks:PackIconLucide Kind="ArrowUpDown"
+                                          Width="14"
+                                          Height="14" />
+                <Button.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Сортировка"
+                                  ItemsSource="{Binding SortOptions}"
+                                  ItemContainerStyle="{StaticResource TrendOptionItem}" />
+                        <MenuItem Header="Порядок"
+                                  ItemsSource="{Binding SortDirectionOptions}"
+                                  ItemContainerStyle="{StaticResource TrendOptionItem}" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+            </Button>
+
+            <Button DockPanel.Dock="Right"
+                    Style="{StaticResource Button.Icon}"
+                    Command="{Binding RefreshCommand}"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="Перечитать историю стримов"
+                    ToolTip="Перечитать историю стримов">
+                <iconPacks:PackIconLucide Kind="RefreshCw"
+                                          Width="14"
+                                          Height="14" />
+            </Button>
+
+            <Button DockPanel.Dock="Right"
+                    x:Name="TrendMenuButton"
+                    Style="{StaticResource Button.Icon}"
+                    Click="OnTrendMenuClick"
+                    VerticalAlignment="Center"
+                    Margin="6,0,0,0"
+                    AutomationProperties.Name="Настройки полосы зрителей"
+                    ToolTip="Что показывать на полосе зрителей"
+                    Visibility="{Binding CanShowTrend, Converter={StaticResource BoolToVisibility}}">
+                <iconPacks:PackIconLucide Kind="Settings2"
+                                          Width="14"
+                                          Height="14" />
+                <Button.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Метрика"
+                                  ItemsSource="{Binding MetricOptions}"
+                                  ItemContainerStyle="{StaticResource TrendOptionItem}" />
+                        <MenuItem Header="Глубина"
+                                  ItemsSource="{Binding LengthOptions}"
+                                  ItemContainerStyle="{StaticResource TrendOptionItem}" />
+                        <Separator />
+                        <MenuItem Header="{Binding TrendVisibilityCaption}"
+                                  Command="{Binding ToggleTrendCommand}" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+            </Button>
+
+            <ToggleButton DockPanel.Dock="Right"
+                          Style="{StaticResource ToggleButton.Toolbar}"
+                          IsChecked="{Binding ShowHidden, Mode=TwoWay}"
+                          VerticalAlignment="Center"
+                          Margin="6,0,0,0"
+                          AutomationProperties.Name="{Binding HiddenToggleHint}"
+                          ToolTip="{Binding HiddenToggleHint}"
+                          Visibility="{Binding HasHiddenSessions, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Kind="EyeOff"
+                                              Width="13"
+                                              Height="13"
+                                              VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding HiddenToggleCaption}"
+                               Margin="6,0,0,0"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </ToggleButton>
+
+            <Border DockPanel.Dock="Right"
+                    Style="{StaticResource Badge}"
+                    VerticalAlignment="Center"
+                    Margin="12,0,8,0"
+                    Visibility="{Binding HasGameFilter, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding GameFilterText}"
+                               FontSize="{DynamicResource Font.Size.Caption}"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               VerticalAlignment="Center"
+                               TextWrapping="NoWrap"
+                               MaxWidth="240"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <Button Style="{StaticResource Button.Icon}"
+                            Command="{Binding ClearGameFilterCommand}"
+                            Margin="6,0,-4,0"
+                            Width="20"
+                            Height="20"
+                            AutomationProperties.Name="Снять фильтр по игре"
+                            ToolTip="Снять фильтр по игре">
+                        <iconPacks:PackIconLucide Kind="X"
+                                                  Width="10"
+                                                  Height="10" />
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <Grid x:Name="SummaryHeader"
+                  Margin="12,0,8,0"
+                  VerticalAlignment="Center"
+                  Visibility="{Binding HasSessions, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding SummaryLine}"
+                           FontSize="{DynamicResource Font.Size.S}"
+                           Foreground="{DynamicResource Fg.Secondary}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           AutomationProperties.Name="{Binding SummaryLine}"
+                           Visibility="{Binding IsCompactLayout, Converter={StaticResource BoolToVisibility}}" />
+
+                <WrapPanel x:Name="SummaryStats"
+                           Orientation="Horizontal"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Margin="0,0,-8,-8"
+                           Visibility="{Binding HasWideSummary, Converter={StaticResource BoolToVisibility}}">
+                    <Border Style="{StaticResource StatCell}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource StatValue}"
+                                       Text="{Binding TotalSessionsText}" />
+                            <TextBlock Style="{StaticResource StatLabel}"
+                                       Text="{Binding TotalSessionsLabel}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource StatCell}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource StatValue}"
+                                       Text="{Binding TotalAirTimeText}" />
+                            <TextBlock Style="{StaticResource StatLabel}"
+                                       Text="в эфире" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource StatCell}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource StatValue}"
+                                       Text="{Binding LastStreamText}" />
+                            <TextBlock Style="{StaticResource StatLabel}"
+                                       Text="последний стрим" />
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+            </Grid>
+
+        </DockPanel>
+
+        <Border x:Name="NoticeStrip"
+                Margin="0,0,0,8"
+                Padding="12,8"
+                CornerRadius="{DynamicResource Radius.M}"
+                Background="{DynamicResource State.ErrorSoft}"
+                Visibility="{Binding Notice, Converter={StaticResource NullToVisibility}}"
+                AutomationProperties.LiveSetting="Assertive">
+            <TextBlock x:Name="NoticeText"
+                       Text="{Binding Notice}"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource State.ErrorText}" />
+        </Border>
+
+        <Border x:Name="SummaryStrip"
+                Style="{StaticResource Card}"
+                Padding="0"
+                Margin="0,0,0,8"
+                Visibility="{Binding IsSummaryOpen, Converter={StaticResource BoolToVisibility}}">
+                <Grid Margin="12,10,12,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition>
+                            <ColumnDefinition.Style>
+                                <Style TargetType="ColumnDefinition">
+                                    <Setter Property="Width"
+                                            Value="3*" />
+                                    <Setter Property="MinWidth"
+                                            Value="220" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasTopCategories}"
+                                                     Value="False">
+                                            <Setter Property="Width"
+                                                    Value="Auto" />
+                                            <Setter Property="MinWidth"
+                                                    Value="0" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ColumnDefinition.Style>
+                        </ColumnDefinition>
+                        <ColumnDefinition>
+                            <ColumnDefinition.Style>
+                                <Style TargetType="ColumnDefinition">
+                                    <Setter Property="Width"
+                                            Value="2*" />
+                                    <Setter Property="MinWidth"
+                                            Value="{Binding ScaledRecordsPaneMinWidth, RelativeSource={RelativeSource AncestorType=views:StreamHistoryPageView}}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasRecords}"
+                                                     Value="False">
+                                            <Setter Property="Width"
+                                                    Value="Auto" />
+                                            <Setter Property="MinWidth"
+                                                    Value="0" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ColumnDefinition.Style>
+                        </ColumnDefinition>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0"
+                          Margin="0,0,16,0"
+                          Visibility="{Binding HasTopCategories, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Style="{StaticResource StatLabel}"
+                                   Margin="8,0,0,4"
+                                   Text="{Binding TopCategoriesHeading}" />
+
+                        <ListBox Grid.Row="1"
+                                 x:Name="CategoriesList"
+                                 ItemsSource="{Binding TopCategories}"
+                                 AutomationProperties.Name="Топ категорий по эфиру"
+                                 ItemContainerStyle="{StaticResource CategoryRowItem}"
+                                 ItemTemplate="{StaticResource CategoryRowTemplate}"
+                                 SelectionMode="Single"
+                                 HorizontalContentAlignment="Stretch"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Disabled" />
+                    </Grid>
+
+                    <Grid Grid.Column="1"
+                          Visibility="{Binding HasRecords, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Style="{StaticResource StatLabel}"
+                                   Margin="0,0,0,4"
+                                   Text="Рекорды" />
+
+                        <ItemsControl Grid.Row="1"
+                                      ItemsSource="{Binding Records}"
+                                      KeyboardNavigation.TabNavigation="Continue">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource RecordCard}"
+                                            Command="{Binding DataContext.SelectSessionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding Row}">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource StatValue.Small}"
+                                                       FontSize="{DynamicResource Font.Size.M}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding ValueText}" />
+
+                                            <TextBlock Style="{StaticResource StatLabel}"
+                                                       Text="{Binding Caption}"
+                                                       TextTrimming="CharacterEllipsis" />
+
+                                            <TextBlock Style="{StaticResource StatLabel}"
+                                                       Margin="0,4,0,0"
+                                                       Text="{Binding DateText}" />
+
+                                            <TextBlock Style="{StaticResource StatLabel}"
+                                                       Margin="0,1,0,0"
+                                                       Text="{Binding TitleText}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Grid>
+        </Border>
+
+        </StackPanel>
+
+        <Border x:Name="TableCard"
+                Grid.Row="1"
+                Style="{StaticResource Card}"
+                Padding="0"
+                Visibility="{Binding HasSessions, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <ItemsControl x:Name="TrendStrip"
+                              Grid.Row="0"
+                              ItemsSource="{Binding Trend}"
+                              Height="40"
+                              KeyboardNavigation.TabNavigation="Once"
+                              KeyboardNavigation.DirectionalNavigation="Contained"
+                              AutomationProperties.Name="{Binding TrendCaption}"
+                              Visibility="{Binding HasTrend, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Rows="1" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="AutomationProperties.Name"
+                                    Value="{Binding Label}" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource TrendBar}"
+                                    Command="{Binding DataContext.SelectSessionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding Row}"
+                                    ToolTip="{Binding Label}"
+                                    AutomationProperties.Name="Выбрать стрим в таблице" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Border x:Name="TrendBaseline"
+                        Grid.Row="1"
+                        Height="1"
+                        Margin="16,0,10,0"
+                        Background="{DynamicResource Border.Default}"
+                        Visibility="{Binding HasTrendBaseline, Converter={StaticResource BoolToVisibility}}" />
+
+                <Grid x:Name="TrendLabels"
+                      Grid.Row="2"
+                      Margin="16,2,10,2"
+                      Visibility="{Binding HasTrendLabels, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Style="{StaticResource TrendDate}"
+                               VerticalAlignment="Center"
+                               Text="{Binding TrendFirstDate}"
+                               Visibility="{Binding HasTrend, Converter={StaticResource BoolToVisibility}}" />
+
+                    <TextBlock Grid.Column="1"
+                               Style="{StaticResource StatLabel}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Margin="8,0,8,0"
+                               Text="{Binding TrendCaption}" />
+
+                    <TextBlock Grid.Column="2"
+                               Style="{StaticResource TrendDate}"
+                               VerticalAlignment="Center"
+                               Text="{Binding TrendLastDate}"
+                               Visibility="{Binding HasTrend, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+
+                <Border x:Name="TrendDivider"
+                        Grid.Row="3"
+                        Height="1"
+                        Background="{DynamicResource Border.Subtle}"
+                        Visibility="{Binding HasTrend, Converter={StaticResource BoolToVisibility}}" />
+
+                <ListBox x:Name="SessionCards"
+                         Grid.Row="4"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Padding="0"
+                         AutomationProperties.Name="Стримы карточками"
+                         ItemsSource="{Binding SortedSessions}"
+                         SelectedItem="{Binding SelectedRow}"
+                         SelectionMode="Single"
+                         HorizontalContentAlignment="Stretch"
+                         ItemContainerStyle="{StaticResource SessionCardItem}"
+                         ItemTemplate="{StaticResource SessionCardTemplate}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         Visibility="{Binding IsCardsView, Converter={StaticResource BoolToVisibility}}">
+                    <ListBox.CommandBindings>
+                        <CommandBinding Command="ApplicationCommands.Copy"
+                                        CanExecute="OnCopySessionCanExecute"
+                                        Executed="OnCopySessionExecuted" />
+                    </ListBox.CommandBindings>
+                </ListBox>
+
+                <Grid x:Name="SessionsTable"
+                      Grid.Row="4"
+                      Grid.IsSharedSizeScope="True"
+                      Visibility="{Binding IsTableView, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid x:Name="SessionsHeader"
+                          Grid.Row="0"
+                          Margin="12,6,24,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="StreamStart" />
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="StreamDuration" />
+                            <ColumnDefinition Width="2*"
+                                              MinWidth="72" />
+                            <ColumnDefinition Width="*"
+                                              MinWidth="72"
+                                              MaxWidth="260" />
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="StreamMessages" />
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="StreamChatters" />
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="StreamPeak" />
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="StreamAverage" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Left"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByColumnCommand}"
+                                CommandParameter="{x:Static vm:StreamSortKey.StartedAt}"
+                                AutomationProperties.Name="Сортировать по началу">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Начало" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding StartedAtSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="1"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Right"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByColumnCommand}"
+                                CommandParameter="{x:Static vm:StreamSortKey.Duration}"
+                                AutomationProperties.Name="Сортировать по длительности эфира">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Эфир" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding DurationSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="2"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Left"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByColumnCommand}"
+                                CommandParameter="{x:Static vm:StreamSortKey.Title}"
+                                AutomationProperties.Name="Сортировать по названию стрима">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Стрим" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding TitleSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="3"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Left"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByColumnCommand}"
+                                CommandParameter="{x:Static vm:StreamSortKey.Game}"
+                                AutomationProperties.Name="Сортировать по игре">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Игра" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding GameSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="4"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Right"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByColumnCommand}"
+                                CommandParameter="{x:Static vm:StreamSortKey.Messages}"
+                                AutomationProperties.Name="Сортировать по сообщениям"
+                                ToolTip="Сообщения">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Сообщ." />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding MessagesSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="5"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Right"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByColumnCommand}"
+                                CommandParameter="{x:Static vm:StreamSortKey.Chatters}"
+                                AutomationProperties.Name="Сортировать по чаттерам">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Чаттеры" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding ChattersSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="6"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Right"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByColumnCommand}"
+                                CommandParameter="{x:Static vm:StreamSortKey.PeakViewers}"
+                                AutomationProperties.Name="Сортировать по пику зрителей"
+                                ToolTip="Пик зрителей">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Пик" />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding PeakViewersSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="7"
+                                Style="{StaticResource TableSortButton}"
+                                HorizontalAlignment="Right"
+                                Margin="2,0,0,0"
+                                Command="{Binding SortByColumnCommand}"
+                                CommandParameter="{x:Static vm:StreamSortKey.AverageViewers}"
+                                AutomationProperties.Name="Сортировать по средним зрителям"
+                                ToolTip="Средние зрители">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Средн." />
+                                <Path Style="{StaticResource TableSortArrow}"
+                                      Tag="{Binding AverageViewersSortIndicator}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Height="1"
+                            Background="{DynamicResource Border.Subtle}" />
+
+                    <ListBox x:Name="SessionsList"
+                             Grid.Row="2"
+                             AutomationProperties.Name="Список сессий стрима"
+                             ItemsSource="{Binding SortedSessions}"
+                             SelectedItem="{Binding SelectedRow}"
+                             SelectionMode="Single"
+                             ItemContainerStyle="{StaticResource SessionRow}"
+                             ItemTemplate="{StaticResource SessionRowTemplate}"
+                             HorizontalContentAlignment="Stretch"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Visible">
+                        <ListBox.CommandBindings>
+                            <CommandBinding Command="ApplicationCommands.Copy"
+                                            CanExecute="OnCopySessionCanExecute"
+                                            Executed="OnCopySessionExecuted" />
+                        </ListBox.CommandBindings>
+                    </ListBox>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <GridSplitter x:Name="LayoutSplitter"
+                      Grid.Row="2"
+                      ResizeDirection="Rows"
+                      Height="8"
+                      Visibility="{Binding HasSessions, Converter={StaticResource BoolToVisibility}}" />
+
+        <controls:EmptyState x:Name="DetailEmpty"
+                             Grid.Row="3"
+                             Icon="MousePointerClick"
+                             Heading="Выберите стрим в списке"
+                             Description="Детали, сегменты и чаттеры появятся здесь."
+                             DescriptionMaxWidth="360"
+                             IconSize="24"
+                             Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolToVisibility}}" />
+
+        <Border x:Name="DetailCard"
+                Grid.Row="3"
+                Style="{StaticResource Card}"
+                Padding="16"
+                Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ContentPresenter Grid.Column="0"
+                                      Margin="0,0,12,0"
+                                      Content="{Binding DetailBoxArt}"
+                                      ContentTemplate="{StaticResource BoxArtCover}" />
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding DetailTitle}"
+                                   FontSize="{DynamicResource Font.Size.L}"
+                                   FontWeight="{DynamicResource Font.Weight.SemiBold}"
+                                   TextWrapping="NoWrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding DetailTitle}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource Fg.Primary}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsDetailTitleMissing}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource Fg.Muted}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <WrapPanel Orientation="Horizontal"
+                                   Margin="0,2,0,0">
+                            <TextBlock Text="{Binding DetailGame}"
+                                       Foreground="{DynamicResource Fg.Secondary}"
+                                       FontSize="{DynamicResource Font.Size.Caption}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,8,0"
+                                       MaxWidth="260" />
+
+                            <TextBlock Text="{Binding DetailComposition}"
+                                       Foreground="{DynamicResource Fg.Muted}"
+                                       FontSize="{DynamicResource Font.Size.Caption}"
+                                       TextWrapping="NoWrap"
+                                       Visibility="{Binding DetailComposition, Converter={StaticResource NullToVisibility}}" />
+                        </WrapPanel>
+
+                        <TextBlock Text="{Binding DetailPeriodText}"
+                                   FontFamily="{DynamicResource Font.Mono}"
+                                   FontSize="{DynamicResource Font.Size.Caption}"
+                                   Foreground="{DynamicResource Fg.Secondary}"
+                                   TextWrapping="NoWrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   Margin="0,6,0,0" />
+
+                        <TextBlock Text="{Binding DetailTrackingText}"
+                                   FontSize="{DynamicResource Font.Size.Caption}"
+                                   Foreground="{DynamicResource Fg.Secondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,2,0,0"
+                                   ToolTip="Столько времени эфира бот был подключён к чату. Сообщения, написанные без него, в статистику стрима не попали."
+                                   Visibility="{Binding DetailTrackingText, Converter={StaticResource NullToVisibility}}" />
+                    </StackPanel>
+                </Grid>
+
+                <ScrollViewer x:Name="DetailBodyScroll"
+                              Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*"
+                                           MinHeight="80" />
+                        </Grid.RowDefinitions>
+
+                        <WrapPanel Grid.Row="0"
+                                   Orientation="Horizontal"
+                                   Margin="0,12,0,0"
+                                   Visibility="{Binding ShowDetailDeltas, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel Style="{StaticResource DeltaCell}"
+                                        Visibility="{Binding DetailMessagesDelta, Converter={StaticResource NullToVisibility}}">
+                                <TextBlock Style="{StaticResource StatLabel}"
+                                           Margin="0"
+                                           Text="Сообщения" />
+                                <TextBlock Style="{StaticResource DeltaText}"
+                                           Tag="{Binding DetailMessagesDeltaTone}"
+                                           Text="{Binding DetailMessagesDelta}" />
+                            </StackPanel>
+
+                            <StackPanel Style="{StaticResource DeltaCell}"
+                                        Visibility="{Binding DetailChattersDelta, Converter={StaticResource NullToVisibility}}">
+                                <TextBlock Style="{StaticResource StatLabel}"
+                                           Margin="0"
+                                           Text="Чаттеры" />
+                                <TextBlock Style="{StaticResource DeltaText}"
+                                           Tag="{Binding DetailChattersDeltaTone}"
+                                           Text="{Binding DetailChattersDelta}" />
+                            </StackPanel>
+
+                            <StackPanel Style="{StaticResource DeltaCell}"
+                                        Visibility="{Binding DetailPeakViewersDelta, Converter={StaticResource NullToVisibility}}">
+                                <TextBlock Style="{StaticResource StatLabel}"
+                                           Margin="0"
+                                           Text="Пик зрителей" />
+                                <TextBlock Style="{StaticResource DeltaText}"
+                                           Tag="{Binding DetailPeakViewersDeltaTone}"
+                                           Text="{Binding DetailPeakViewersDelta}" />
+                            </StackPanel>
+
+                            <StackPanel Style="{StaticResource DeltaCell}"
+                                        Visibility="{Binding DetailAverageViewersDelta, Converter={StaticResource NullToVisibility}}">
+                                <TextBlock Style="{StaticResource StatLabel}"
+                                           Margin="0"
+                                           Text="В среднем" />
+                                <TextBlock Style="{StaticResource DeltaText}"
+                                           Tag="{Binding DetailAverageViewersDeltaTone}"
+                                           Text="{Binding DetailAverageViewersDelta}" />
+                            </StackPanel>
+                        </WrapPanel>
+
+                        <Border Grid.Row="1"
+                                Height="1"
+                                Background="{DynamicResource Border.Subtle}"
+                                Margin="0,12,0,0" />
+
+                        <Grid x:Name="DetailSplit"
+                              Grid.Row="2"
+                              Margin="0,12,0,0"
+                              MaxHeight="{Binding ViewportHeight, ElementName=DetailBodyScroll}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"
+                                                  MinWidth="220" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="Auto"
+                                                  MinWidth="240"
+                                                  MaxWidth="360" />
+                            </Grid.ColumnDefinitions>
+
+                            <Grid x:Name="SegmentsPane"
+                                  Grid.Column="0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Style="{StaticResource TextBlock.Heading}"
+                                           FontSize="{DynamicResource Font.Size.L}"
+                                           Text="{Binding SegmentsHeading}" />
+
+                                <ItemsControl Grid.Row="1"
+                                              ItemsSource="{Binding Segments}"
+                                              MinHeight="22"
+                                              Margin="0,10,0,0"
+                                              Focusable="False"
+                                              AutomationProperties.Name="Сегменты по длительности"
+                                              Visibility="{Binding HasSegmentTimeline, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <infrastructure:ProportionalPanel Gap="2" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="infrastructure:ProportionalPanel.Share"
+                                                    Value="{Binding Share}" />
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource SegmentBlock}"
+                                                    ToolTip="{Binding TimelineText}">
+                                                <TextBlock Style="{StaticResource SegmentCaption}"
+                                                           Text="{Binding Caption}" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Grid.Row="2"
+                                           Style="{StaticResource TextBlock.Subtle}"
+                                           VerticalAlignment="Top"
+                                           Margin="0,10,0,0"
+                                           Text="Сегментов нет"
+                                           Visibility="{Binding HasSegments, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                                <ListBox x:Name="SegmentCards"
+                                         Grid.Row="2"
+                                         Margin="0,10,0,0"
+                                         ItemsSource="{Binding Segments}"
+                                         AutomationProperties.Name="Сегменты выбранного стрима"
+                                         Visibility="{Binding HasSegments, Converter={StaticResource BoolToVisibility}}"
+                                         ItemContainerStyle="{StaticResource SegmentCardItem}"
+                                         ItemTemplate="{StaticResource SegmentCardTemplate}"
+                                         SelectionMode="Single"
+                                         HorizontalContentAlignment="Stretch"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Padding="0"
+                                         SizeChanged="OnSegmentCardsSizeChanged"
+                                         ScrollViewer.CanContentScroll="False"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid VerticalAlignment="Top"
+                                                         Columns="{Binding SegmentColumns, RelativeSource={RelativeSource AncestorType=views:StreamHistoryPageView}}" />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                </ListBox>
+                            </Grid>
+
+                            <GridSplitter x:Name="DetailSplitter"
+                                          Grid.Column="1"
+                                          ResizeDirection="Columns" />
+
+                            <Grid x:Name="ChattersPane"
+                                  Grid.Column="2">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Style="{StaticResource TextBlock.Heading}"
+                                           FontSize="{DynamicResource Font.Size.L}"
+                                           Text="{Binding ChattersHeading}" />
+
+                                <TextBlock Grid.Row="1"
+                                           Style="{StaticResource TextBlock.Subtle}"
+                                           VerticalAlignment="Top"
+                                           Margin="0,10,0,0"
+                                           Text="Чаттеров нет"
+                                           Visibility="{Binding HasChatters, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                                <ListBox Grid.Row="1"
+                                         Margin="0,10,0,0"
+                                         ItemsSource="{Binding Chatters}"
+                                         AutomationProperties.Name="Чаттеры выбранного стрима"
+                                         Visibility="{Binding HasChatters, Converter={StaticResource BoolToVisibility}}"
+                                         ItemContainerStyle="{StaticResource ChatterRowItem}"
+                                         ItemTemplate="{StaticResource ChatterRowTemplate}"
+                                         SelectionMode="Single"
+                                         HorizontalContentAlignment="Stretch"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Padding="0"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <controls:EmptyState x:Name="HistoryEmpty"
+                             Grid.Row="1"
+                             Grid.RowSpan="3"
+                             Icon="History"
+                             Heading="{Binding EmptyHeading}"
+                             Description="{Binding EmptyDescription}"
+                             DescriptionMaxWidth="360"
+                             Visibility="{Binding HasSessions, Converter={StaticResource InverseBoolToVisibility}}" />
+    </Grid>
+</UserControl>

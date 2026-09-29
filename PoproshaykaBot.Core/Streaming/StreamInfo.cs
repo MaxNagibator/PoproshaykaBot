@@ -1,4 +1,4 @@
-namespace PoproshaykaBot.Core.Streaming;
+﻿namespace PoproshaykaBot.Core.Streaming;
 
 /// <summary>
 /// Описание текущего стрима канала (заголовок, игра, зрители и т.п.).
@@ -20,4 +20,7 @@ public class StreamInfo
     public string ThumbnailUrl { get; set; } = string.Empty;
     public IReadOnlyList<string> Tags { get; set; } = [];
     public bool IsMature { get; set; }
+
+    // TODO: снимок без названия, категории и зрителей считается ещё не загруженным (из stream.online до ответа Helix); появится признак источника – сверять по нему
+    public bool IsBare => string.IsNullOrWhiteSpace(Title) && string.IsNullOrWhiteSpace(GameName) && ViewerCount == 0;
 }

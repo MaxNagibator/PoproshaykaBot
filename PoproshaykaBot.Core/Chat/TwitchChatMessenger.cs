@@ -12,11 +12,26 @@ public sealed class TwitchChatMessenger(ChatSender chatSender) : IChatMessenger
 {
     public void Send(string text)
     {
-        _ = chatSender.EnqueueAsync(text, null, CancellationToken.None);
+        Send(text, null);
     }
 
     public void Reply(string replyToMessageId, string text)
     {
-        _ = chatSender.EnqueueAsync(text, replyToMessageId, CancellationToken.None);
+        Reply(replyToMessageId, text, null);
+    }
+
+    public void Send(string text, CommandResponseMark? commandResponse)
+    {
+        _ = chatSender.EnqueueAsync(text, null, commandResponse, CancellationToken.None);
+    }
+
+    public void Reply(string replyToMessageId, string text, CommandResponseMark? commandResponse)
+    {
+        _ = chatSender.EnqueueAsync(text, replyToMessageId, commandResponse, CancellationToken.None);
+    }
+
+    public void Whisper(string toUserId, string fallbackReplyToMessageId, string text, CommandResponseMark? commandResponse)
+    {
+        _ = chatSender.EnqueueWhisperAsync(text, toUserId, fallbackReplyToMessageId, commandResponse, CancellationToken.None);
     }
 }

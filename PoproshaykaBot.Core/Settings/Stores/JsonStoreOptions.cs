@@ -1,6 +1,7 @@
 ﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace PoproshaykaBot.Core.Settings.Stores;
 
@@ -11,6 +12,10 @@ public static class JsonStoreOptions
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver
+        {
+            Modifiers = { JsonStoreNullDefaults.Apply },
+        },
         Converters =
         {
             new ColorJsonConverter(),

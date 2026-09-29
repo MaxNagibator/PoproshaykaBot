@@ -167,7 +167,7 @@ sealed partial class UserStatisticsForm
         labelUserId.Name = "labelUserId";
         labelUserId.Size = new Size(305, 25);
         labelUserId.TabIndex = 0;
-        labelUserId.Text = "🆔 ID: —";
+        labelUserId.Text = "🆔 ID: –";
         labelUserId.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelUserName
@@ -178,7 +178,7 @@ sealed partial class UserStatisticsForm
         labelUserName.Name = "labelUserName";
         labelUserName.Size = new Size(305, 25);
         labelUserName.TabIndex = 1;
-        labelUserName.Text = "👤 Имя: —";
+        labelUserName.Text = "👤 Имя: –";
         labelUserName.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelMessages

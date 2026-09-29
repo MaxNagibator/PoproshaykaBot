@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using PoproshaykaBot.Core.Chat;
 using PoproshaykaBot.Core.Chat.Commands;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Chat;
 using PoproshaykaBot.Core.Infrastructure.Events.Statistics;
@@ -17,16 +18,19 @@ public sealed class StreamSessionStatisticsHandler :
     IEventHandler<StreamMetadataResolved>,
     IEventHandler<ChatMessageReceived>,
     IEventHandler<ChannelUpdated>,
+    IEventHandler<ChatIngestionStarted>,
+    IEventHandler<ChatIngestionStopped>,
     IEventSubscriber,
     IAsyncDisposable
 {
-    private const string MissingValuePlaceholder = "—";
+    private const string MissingValuePlaceholder = "–";
     private static readonly TimeSpan ViewerSampleInterval = TimeSpan.FromMinutes(1);
 
-    private static readonly TimeSpan StreamMatchTolerance = TimeSpan.FromSeconds(5);
+    internal static readonly TimeSpan StreamMatchTolerance = TimeSpan.FromMinutes(5);
 
     private readonly IChatMessenger _messenger;
     private readonly IStreamStatus _streamStatus;
+    private readonly ITargetChannelProvider _targetChannelProvider;
     private readonly SettingsManager _settingsManager;
     private readonly TimeProvider _timeProvider;
     private readonly IEventBus _eventBus;
@@ -37,11 +41,17 @@ public sealed class StreamSessionStatisticsHandler :
     private readonly IDisposable _metadataResolvedSubscription;
     private readonly IDisposable _chatSubscription;
     private readonly IDisposable _channelUpdatedSubscription;
+    private readonly IDisposable _ingestionStartedSubscription;
+    private readonly IDisposable _ingestionStoppedSubscription;
 
     private readonly object _stateLock = new();
     private readonly Dictionary<string, ChatterTally> _chatters = new(StringComparer.Ordinal);
     private readonly List<SegmentTally> _segments = [];
+    private readonly List<ActiveStreamSessionInterval> _tracked = [];
+    private bool _trackedKnown;
+    private DateTimeOffset? _ingestionSince;
     private string? _channel;
+    private string? _streamId;
     private DateTimeOffset? _sessionStartedAt;
 
     private CancellationTokenSource? _samplingCts;
@@ -51,6 +61,7 @@ public sealed class StreamSessionStatisticsHandler :
     public StreamSessionStatisticsHandler(
         IChatMessenger messenger,
         IStreamStatus streamStatus,
+        ITargetChannelProvider targetChannelProvider,
         SettingsManager settingsManager,
         TimeProvider timeProvider,
         IEventBus eventBus,
@@ -59,6 +70,7 @@ public sealed class StreamSessionStatisticsHandler :
     {
         _messenger = messenger;
         _streamStatus = streamStatus;
+        _targetChannelProvider = targetChannelProvider;
         _settingsManager = settingsManager;
         _timeProvider = timeProvider;
         _eventBus = eventBus;
@@ -70,15 +82,24 @@ public sealed class StreamSessionStatisticsHandler :
         _metadataResolvedSubscription = eventBus.Subscribe<StreamMetadataResolved>(this);
         _chatSubscription = eventBus.Subscribe<ChatMessageReceived>(this);
         _channelUpdatedSubscription = eventBus.Subscribe<ChannelUpdated>(this);
+        _ingestionStartedSubscription = eventBus.Subscribe<ChatIngestionStarted>(this);
+        _ingestionStoppedSubscription = eventBus.Subscribe<ChatIngestionStopped>(this);
     }
 
     public async Task HandleAsync(StreamWentOnline @event, CancellationToken cancellationToken)
     {
+        if (!_targetChannelProvider.Current.RecordsUserData)
+        {
+            _logger.LogInformation("Статистика сессии не собирается – идёт отладка на чужом канале в общем профиле данных");
+            return;
+        }
+
         var startedAt = ResolveStartedAt(@event);
         var channel = string.IsNullOrEmpty(@event.Channel)
-            ? _settingsManager.Current.Twitch.Channel
+            ? _targetChannelProvider.Current.Login
             : @event.Channel;
 
+        var streamId = NullIfEmpty(@event.Stream?.Id);
         var initialViewers = @event.Stream?.ViewerCount ?? 0;
         var initialTitle = NullIfEmpty(@event.Stream?.Title);
         var initialGame = NullIfEmpty(@event.Stream?.GameName);
@@ -90,7 +111,7 @@ public sealed class StreamSessionStatisticsHandler :
 
         var resume = @event.IsCatchUp
                      && usableDraft
-                     && IsSameStream(existingDraft!, channel, startedAt);
+                     && IsSameStream(existingDraft!, channel, startedAt, streamId);
 
         if (!resume && usableDraft)
         {
@@ -103,11 +124,15 @@ public sealed class StreamSessionStatisticsHandler :
             _channel = channel;
             _chatters.Clear();
             _segments.Clear();
+            _tracked.Clear();
+            _trackedKnown = !resume || existingDraft!.TrackedIntervals != null;
 
             if (resume)
             {
                 _sessionStartedAt = existingDraft!.StartedAt;
+                _streamId = streamId ?? existingDraft.StreamId;
                 _segments.AddRange(RestoreSegments(existingDraft));
+                _tracked.AddRange(RestoreTracked(existingDraft, existingDraft.UpdatedAt));
 
                 foreach (var chatter in existingDraft.Chatters)
                 {
@@ -130,6 +155,7 @@ public sealed class StreamSessionStatisticsHandler :
             else
             {
                 _sessionStartedAt = startedAt;
+                _streamId = streamId;
                 _segments.Add(new()
                 {
                     StartedAt = startedAt,
@@ -139,6 +165,11 @@ public sealed class StreamSessionStatisticsHandler :
                     ViewerSamplesSum = initialViewers,
                     ViewerSamplesCount = initialViewers > 0 ? 1 : 0,
                 });
+            }
+
+            if (_ingestionSince is { } ingestionSince)
+            {
+                OpenTracked(ingestionSince);
             }
         }
 
@@ -163,7 +194,7 @@ public sealed class StreamSessionStatisticsHandler :
 
     public Task HandleAsync(ChatMessageReceived @event, CancellationToken cancellationToken)
     {
-        if (@event.IsBot)
+        if (@event.IsBot || !_targetChannelProvider.Current.RecordsUserData)
         {
             return Task.CompletedTask;
         }
@@ -214,14 +245,69 @@ public sealed class StreamSessionStatisticsHandler :
         return Task.CompletedTask;
     }
 
-    public Task HandleAsync(StreamMetadataResolved @event, CancellationToken cancellationToken)
+    public Task HandleAsync(ChatIngestionStarted @event, CancellationToken cancellationToken)
     {
         lock (_stateLock)
         {
+            if (_ingestionSince != null)
+            {
+                return Task.CompletedTask;
+            }
+
+            _ingestionSince = @event.At;
+
             if (_sessionStartedAt == null)
             {
                 return Task.CompletedTask;
             }
+
+            OpenTracked(@event.At);
+        }
+
+        Checkpoint();
+
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ChatIngestionStopped @event, CancellationToken cancellationToken)
+    {
+        lock (_stateLock)
+        {
+            if (_ingestionSince is not { } since || @event.At < since)
+            {
+                return Task.CompletedTask;
+            }
+
+            _ingestionSince = null;
+
+            if (_sessionStartedAt == null)
+            {
+                return Task.CompletedTask;
+            }
+
+            foreach (var interval in _tracked)
+            {
+                interval.EndedAt ??= @event.At;
+            }
+        }
+
+        Checkpoint();
+
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(StreamMetadataResolved @event, CancellationToken cancellationToken)
+    {
+        bool identityChanged;
+
+        lock (_stateLock)
+        {
+            if (_sessionStartedAt == null || IsForeignStream(@event.Stream))
+            {
+                return Task.CompletedTask;
+            }
+
+            identityChanged = AdoptCanonicalIdentity(@event.Stream);
 
             ApplyMetadata(@event.Stream.Title, @event.Stream.GameName);
 
@@ -231,6 +317,11 @@ public sealed class StreamSessionStatisticsHandler :
             {
                 current.PeakViewers = @event.Stream.ViewerCount;
             }
+        }
+
+        if (identityChanged)
+        {
+            Checkpoint();
         }
 
         return Task.CompletedTask;
@@ -263,7 +354,7 @@ public sealed class StreamSessionStatisticsHandler :
                 _activeSessionStore.Delete();
             }
 
-            _logger.LogDebug("Офлайн без активной сессии в памяти — статистика собрана из черновика (если он был)");
+            _logger.LogDebug("Офлайн без активной сессии в памяти – статистика собрана из черновика (если он был)");
             return;
         }
 
@@ -327,6 +418,8 @@ public sealed class StreamSessionStatisticsHandler :
         _metadataResolvedSubscription.Dispose();
         _chatSubscription.Dispose();
         _channelUpdatedSubscription.Dispose();
+        _ingestionStartedSubscription.Dispose();
+        _ingestionStoppedSubscription.Dispose();
 
         try
         {
@@ -355,10 +448,19 @@ public sealed class StreamSessionStatisticsHandler :
         return draft.StartedAt != default && !string.IsNullOrEmpty(draft.Channel);
     }
 
-    private static bool IsSameStream(ActiveStreamSession draft, string channel, DateTimeOffset startedAt)
+    private static bool IsSameStream(ActiveStreamSession draft, string channel, DateTimeOffset startedAt, string? streamId)
     {
-        return string.Equals(draft.Channel, channel, StringComparison.OrdinalIgnoreCase)
-               && (draft.StartedAt - startedAt).Duration() <= StreamMatchTolerance;
+        if (!string.Equals(draft.Channel, channel, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(streamId) && !string.IsNullOrEmpty(draft.StreamId))
+        {
+            return string.Equals(draft.StreamId, streamId, StringComparison.Ordinal);
+        }
+
+        return (draft.StartedAt - startedAt).Duration() <= StreamMatchTolerance;
     }
 
     private static List<StreamSessionChatter> SortChatters(IEnumerable<StreamSessionChatter> chatters)
@@ -410,13 +512,47 @@ public sealed class StreamSessionStatisticsHandler :
         ];
     }
 
+    private static List<ActiveStreamSessionInterval> RestoreTracked(ActiveStreamSession draft, DateTimeOffset closeOpenAt)
+    {
+        if (draft.TrackedIntervals == null)
+        {
+            return [];
+        }
+
+        return draft.TrackedIntervals
+            .OfType<ActiveStreamSessionInterval>()
+            .Select(interval => new ActiveStreamSessionInterval
+            {
+                StartedAt = interval.StartedAt,
+                EndedAt = interval.EndedAt ?? (closeOpenAt > interval.StartedAt ? closeOpenAt : interval.StartedAt),
+            })
+            .ToList();
+    }
+
+    private static List<StreamSessionInterval>? ToIntervals(bool known, IEnumerable<ActiveStreamSessionInterval> tracked, DateTimeOffset closeOpenAt)
+    {
+        if (!known)
+        {
+            return null;
+        }
+
+        return tracked
+            .Select(interval => new StreamSessionInterval
+            {
+                StartedAt = interval.StartedAt,
+                EndedAt = interval.EndedAt ?? closeOpenAt,
+            })
+            .ToList();
+    }
+
     private static StreamSessionRecord BuildRecord(
         string channel,
         DateTimeOffset startedAt,
         DateTimeOffset endedAt,
         int chatterCount,
         List<StreamSessionChatter> chatters,
-        IReadOnlyList<SegmentTally> segments)
+        IReadOnlyList<SegmentTally> segments,
+        List<StreamSessionInterval>? tracked)
     {
         var normalizedEnd = endedAt < startedAt ? startedAt : endedAt;
 
@@ -467,6 +603,7 @@ public sealed class StreamSessionStatisticsHandler :
             AverageViewers = AverageViewers(viewerSamplesSum, viewerSamplesCount),
             Chatters = chatters,
             Segments = resultSegments,
+            TrackedIntervals = tracked == null ? null : StreamSessionInterval.Normalize(tracked, startedAt, normalizedEnd),
         };
     }
 
@@ -483,43 +620,121 @@ public sealed class StreamSessionStatisticsHandler :
             MessageCount = chatter.MessageCount,
         }));
 
-        return BuildRecord(draft.Channel, draft.StartedAt, endedAt, draft.Chatters.Count, chatters, segments);
+        var lastSeenAlive = draft.UpdatedAt < endedAt ? draft.UpdatedAt : endedAt;
+        var tracked = ToIntervals(draft.TrackedIntervals != null, RestoreTracked(draft, lastSeenAlive), lastSeenAlive);
+
+        return BuildRecord(draft.Channel, draft.StartedAt, endedAt, draft.Chatters.Count, chatters, segments, tracked);
+    }
+
+    private void OpenTracked(DateTimeOffset at)
+    {
+        if (_tracked.Count > 0 && _tracked[^1].EndedAt == null)
+        {
+            return;
+        }
+
+        _tracked.Add(new() { StartedAt = at });
     }
 
     private void ApplyMetadata(string? title, string? game)
     {
         var current = _segments[^1];
 
-        if (!string.IsNullOrEmpty(game))
+        var nextGame = string.IsNullOrEmpty(game) ? current.Game : game;
+        var nextTitle = string.IsNullOrEmpty(title) ? current.Title : title;
+
+        var gameChanged = !string.IsNullOrEmpty(game)
+                          && !string.IsNullOrEmpty(current.Game)
+                          && !string.Equals(current.Game, game, StringComparison.OrdinalIgnoreCase);
+
+        var titleChanged = !string.IsNullOrEmpty(title)
+                           && !string.IsNullOrEmpty(current.Title)
+                           && !string.Equals(current.Title, title, StringComparison.Ordinal);
+
+        if (!gameChanged && !titleChanged)
         {
-            if (string.IsNullOrEmpty(current.Game))
-            {
-                current.Game = game;
-            }
-            else if (!string.Equals(current.Game, game, StringComparison.OrdinalIgnoreCase))
-            {
-                var now = _timeProvider.GetUtcNow();
-                current.EndedAt = now;
-
-                current = new()
-                {
-                    StartedAt = now,
-                    Title = current.Title,
-                    Game = game,
-                };
-
-                _segments.Add(current);
-
-                _logger.LogInformation("Категория стрима изменена на \"{Game}\" — открыт новый сегмент статистики (всего сегментов: {Count})",
-                    game,
-                    _segments.Count);
-            }
+            current.Game = nextGame;
+            current.Title = nextTitle;
+            return;
         }
 
-        if (!string.IsNullOrEmpty(title))
+        var now = _timeProvider.GetUtcNow();
+        current.EndedAt = now;
+
+        _segments.Add(new()
         {
-            current.Title = title;
+            StartedAt = now,
+            Title = nextTitle,
+            Game = nextGame,
+        });
+
+        if (gameChanged && titleChanged)
+        {
+            _logger.LogInformation("Категория и название стрима изменены на \"{Game}\" и \"{Title}\" – открыт новый сегмент статистики (всего сегментов: {Count})",
+                nextGame,
+                nextTitle,
+                _segments.Count);
         }
+        else if (gameChanged)
+        {
+            _logger.LogInformation("Категория стрима изменена на \"{Game}\" – открыт новый сегмент статистики (всего сегментов: {Count})",
+                nextGame,
+                _segments.Count);
+        }
+        else
+        {
+            _logger.LogInformation("Название стрима изменено на \"{Title}\" – открыт новый сегмент статистики (всего сегментов: {Count})",
+                nextTitle,
+                _segments.Count);
+        }
+    }
+
+    private bool IsForeignStream(StreamInfo stream)
+    {
+        var streamId = NullIfEmpty(stream.Id);
+
+        if (streamId == null || _streamId == null || string.Equals(_streamId, streamId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        _logger.LogWarning("Метаданные относятся к другому стриму ({ResolvedId} вместо {SessionId}) – в статистику сессии не попадают",
+            streamId,
+            _streamId);
+
+        return true;
+    }
+
+    private bool AdoptCanonicalIdentity(StreamInfo stream)
+    {
+        var streamId = NullIfEmpty(stream.Id);
+        var changed = streamId != null && _streamId == null;
+
+        if (changed)
+        {
+            _streamId = streamId;
+        }
+
+        if (stream.StartedAt == default)
+        {
+            return changed;
+        }
+
+        var canonical = new DateTimeOffset(DateTime.SpecifyKind(stream.StartedAt, DateTimeKind.Utc));
+
+        if (canonical == _sessionStartedAt)
+        {
+            return changed;
+        }
+
+        _logger.LogInformation("Начало сессии статистики уточнено по данным Twitch: {PreviousStart} → {CanonicalStart}",
+            _sessionStartedAt,
+            canonical);
+
+        _segments[0].StartedAt = canonical;
+        _sessionStartedAt = canonical;
+
+        return true;
     }
 
     private DateTimeOffset ResolveStartedAt(StreamWentOnline @event)
@@ -540,7 +755,7 @@ public sealed class StreamSessionStatisticsHandler :
 
         if (hasMemorySession)
         {
-            _logger.LogDebug("Catch-up offline при активной сессии в памяти — событие проигнорировано");
+            _logger.LogDebug("Catch-up offline при активной сессии в памяти – событие проигнорировано");
             return Task.CompletedTask;
         }
 
@@ -593,12 +808,15 @@ public sealed class StreamSessionStatisticsHandler :
                 MessageCount = pair.Value.MessageCount,
             }));
 
-            var record = BuildRecord(channel, _sessionStartedAt.Value, endedAt, _chatters.Count, chatters, _segments);
+            var tracked = ToIntervals(_trackedKnown, _tracked, endedAt);
+            var record = BuildRecord(channel, _sessionStartedAt.Value, endedAt, _chatters.Count, chatters, _segments, tracked);
 
             _channel = null;
+            _streamId = null;
             _sessionStartedAt = null;
             _chatters.Clear();
             _segments.Clear();
+            _tracked.Clear();
 
             return record;
         }
@@ -632,6 +850,7 @@ public sealed class StreamSessionStatisticsHandler :
             return new()
             {
                 Channel = _channel,
+                StreamId = _streamId,
                 StartedAt = _sessionStartedAt.Value,
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 MessageCount = _segments.Sum(segment => segment.MessageCount),
@@ -649,6 +868,14 @@ public sealed class StreamSessionStatisticsHandler :
                     })
                     .ToList(),
                 Segments = segments,
+                TrackedIntervals = _trackedKnown
+                    ? _tracked.Select(interval => new ActiveStreamSessionInterval
+                        {
+                            StartedAt = interval.StartedAt,
+                            EndedAt = interval.EndedAt,
+                        })
+                        .ToList()
+                    : null,
             };
         }
     }
@@ -668,7 +895,9 @@ public sealed class StreamSessionStatisticsHandler :
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Не удалось сохранить чекпойнт активной сессии стрима");
+            _logger.LogError(exception, "Не удалось сохранить чекпойнт активной сессии стрима: канал {Channel}, стрим {StreamId}",
+                snapshot.Channel,
+                snapshot.StreamId);
         }
     }
 
@@ -771,8 +1000,12 @@ public sealed class StreamSessionStatisticsHandler :
                 current.PeakViewers = snapshot.ViewerCount;
             }
 
-            current.ViewerSamplesSum += snapshot.ViewerCount;
-            current.ViewerSamplesCount++;
+            // TODO: нулевой замер отбрасывается, чтобы голый снимок из stream.online не занижал среднее; стрим с настоящим нулём зрителей замеров не получит – при признаке источника в StreamInfo фильтровать по нему
+            if (snapshot.ViewerCount > 0)
+            {
+                current.ViewerSamplesSum += snapshot.ViewerCount;
+                current.ViewerSamplesCount++;
+            }
         }
     }
 

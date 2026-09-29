@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using PoproshaykaBot.Core.Settings;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Twitch.Helix;
 
 namespace PoproshaykaBot.Core.Twitch;
@@ -8,7 +8,7 @@ namespace PoproshaykaBot.Core.Twitch;
 public sealed class BroadcasterIdProvider(
     [FromKeyedServices(TwitchEndpoints.HelixBotClient)]
     ITwitchHelixClient helix,
-    SettingsManager settingsManager,
+    ITargetChannelProvider targetChannelProvider,
     ILogger<BroadcasterIdProvider> logger)
     : IBroadcasterIdProvider
 {
@@ -19,7 +19,7 @@ public sealed class BroadcasterIdProvider(
 
     public async Task<string?> GetAsync(CancellationToken cancellationToken)
     {
-        var channel = settingsManager.Current.Twitch.Channel;
+        var channel = targetChannelProvider.Current.Login;
 
         if (string.IsNullOrWhiteSpace(channel))
         {

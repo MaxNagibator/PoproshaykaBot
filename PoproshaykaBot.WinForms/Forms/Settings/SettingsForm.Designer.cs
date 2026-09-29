@@ -59,6 +59,8 @@ partial class SettingsForm
         _miscSettingsControl = new MiscSettingsControl();
         _updateTabPage = new TabPage();
         _updateSettingsControl = new UpdateSettingsControl();
+        _debugChannelTabPage = new TabPage();
+        _debugChannelSettingsControl = new DebugChannelSettingsControl();
         _buttonPanel = new FlowLayoutPanel();
         _resetButton = new Button();
         _okButton = new Button();
@@ -81,6 +83,7 @@ partial class SettingsForm
         _dashboardTabPage.SuspendLayout();
         _miscTabPage.SuspendLayout();
         _updateTabPage.SuspendLayout();
+        _debugChannelTabPage.SuspendLayout();
         _buttonPanel.SuspendLayout();
         SuspendLayout();
         // 
@@ -113,6 +116,7 @@ partial class SettingsForm
         _tabControl.Controls.Add(_dashboardTabPage);
         _tabControl.Controls.Add(_miscTabPage);
         _tabControl.Controls.Add(_updateTabPage);
+        _tabControl.Controls.Add(_debugChannelTabPage);
         _tabControl.Dock = DockStyle.Fill;
         _tabControl.Location = new Point(15, 15);
         _tabControl.Name = "_tabControl";
@@ -422,6 +426,27 @@ partial class SettingsForm
         _updateSettingsControl.TabIndex = 0;
         _updateSettingsControl.SettingChanged += OnSettingChanged;
         //
+        // _debugChannelTabPage
+        //
+        _debugChannelTabPage.Controls.Add(_debugChannelSettingsControl);
+        _debugChannelTabPage.Location = new Point(4, 24);
+        _debugChannelTabPage.Name = "_debugChannelTabPage";
+        _debugChannelTabPage.Padding = new Padding(10, 10, 10, 10);
+        _debugChannelTabPage.Size = new Size(613, 549);
+        _debugChannelTabPage.TabIndex = 13;
+        _debugChannelTabPage.Text = "Отладка";
+        _debugChannelTabPage.UseVisualStyleBackColor = true;
+        //
+        // _debugChannelSettingsControl
+        //
+        _debugChannelSettingsControl.Dock = DockStyle.Fill;
+        _debugChannelSettingsControl.Location = new Point(10, 10);
+        _debugChannelSettingsControl.Margin = new Padding(6, 7, 6, 7);
+        _debugChannelSettingsControl.Name = "_debugChannelSettingsControl";
+        _debugChannelSettingsControl.Size = new Size(593, 529);
+        _debugChannelSettingsControl.TabIndex = 0;
+        _debugChannelSettingsControl.SettingChanged += OnSettingChanged;
+        //
         // _buttonPanel
         //
         _buttonPanel.AutoSize = true;
@@ -516,6 +541,7 @@ partial class SettingsForm
         _dashboardTabPage.ResumeLayout(false);
         _miscTabPage.ResumeLayout(false);
         _updateTabPage.ResumeLayout(false);
+        _debugChannelTabPage.ResumeLayout(false);
         _buttonPanel.ResumeLayout(false);
         ResumeLayout(false);
     }
@@ -548,6 +574,8 @@ partial class SettingsForm
     private MiscSettingsControl _miscSettingsControl;
     private TabPage _updateTabPage;
     private UpdateSettingsControl _updateSettingsControl;
+    private TabPage _debugChannelTabPage;
+    private DebugChannelSettingsControl _debugChannelSettingsControl;
     private TabPage _pollsTabPage;
     private PollsSettingsControl _pollsSettingsControl;
     private TabPage _dashboardTabPage;

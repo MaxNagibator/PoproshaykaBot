@@ -56,7 +56,7 @@ public sealed class UpdateEnvironment : IUpdateEnvironment
         return string.IsNullOrWhiteSpace(slug) ? DefaultRepositorySlug : slug.Trim();
     }
 
-    private static Version ResolveCurrentVersion()
+    internal static Version ResolveCurrentVersion()
     {
         var assembly = Assembly.GetEntryAssembly() ?? typeof(UpdateEnvironment).Assembly;
 

@@ -188,7 +188,7 @@ partial class HealthCheckPage
         _hintLabel.ForeColor = Color.Gray;
         _hintLabel.Margin = new Padding(0);
         _hintLabel.Name = "_hintLabel";
-        _hintLabel.Text = "Все проверки опциональны. После завершения — нажмите «Далее».";
+        _hintLabel.Text = "Все проверки опциональны. После завершения – нажмите «Далее».";
         _hintLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // HealthCheckPage

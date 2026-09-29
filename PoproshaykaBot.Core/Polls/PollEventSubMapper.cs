@@ -21,7 +21,20 @@ public static class PollEventSubMapper
         return FromEventSubPayload(payload, status, sourceProfileId, "ended_at");
     }
 
-    public static PollSnapshot FromHelix(HelixPollInfo info, Guid? sourceProfileId)
+    public static PollSnapshot? FromHelix(HelixPollInfo info, Guid? sourceProfileId)
+    {
+        return TryParseHelixStatus(info.Status, out var status)
+            ? FromHelix(info, sourceProfileId, status)
+            : null;
+    }
+
+    public static PollSnapshot FromCreatedPoll(HelixPollInfo info, Guid sourceProfileId)
+    {
+        TryParseHelixStatus(info.Status, out var status);
+        return FromHelix(info, sourceProfileId, status);
+    }
+
+    private static PollSnapshot FromHelix(HelixPollInfo info, Guid? sourceProfileId, PollSnapshotStatus status)
     {
         var startedUtc = DateTime.SpecifyKind(info.StartedAt, DateTimeKind.Utc);
         var endsUtc = startedUtc.AddSeconds(info.DurationSeconds);
@@ -41,7 +54,7 @@ public static class PollEventSubMapper
             endsUtc,
             info.ChannelPointsVotingEnabled,
             info.ChannelPointsPerVote,
-            ParseHelixStatus(info.Status),
+            status,
             endedUtc);
     }
 
@@ -139,18 +152,38 @@ public static class PollEventSubMapper
         };
     }
 
-    private static PollSnapshotStatus ParseHelixStatus(string? status)
+    private static bool TryParseHelixStatus(string? status, out PollSnapshotStatus parsed)
     {
-        return (status ?? string.Empty).ToUpperInvariant() switch
+        switch ((status ?? string.Empty).ToUpperInvariant())
         {
-            "ACTIVE" => PollSnapshotStatus.Active,
-            "COMPLETED" => PollSnapshotStatus.Completed,
-            "TERMINATED" => PollSnapshotStatus.Terminated,
-            "ARCHIVED" => PollSnapshotStatus.Archived,
-            "MODERATED" => PollSnapshotStatus.Moderated,
-            "INVALID" => PollSnapshotStatus.Invalid,
-            _ => PollSnapshotStatus.Active,
-        };
+            case "ACTIVE":
+                parsed = PollSnapshotStatus.Active;
+                return true;
+
+            case "COMPLETED":
+                parsed = PollSnapshotStatus.Completed;
+                return true;
+
+            case "TERMINATED":
+                parsed = PollSnapshotStatus.Terminated;
+                return true;
+
+            case "ARCHIVED":
+                parsed = PollSnapshotStatus.Archived;
+                return true;
+
+            case "MODERATED":
+                parsed = PollSnapshotStatus.Moderated;
+                return true;
+
+            case "INVALID":
+                parsed = PollSnapshotStatus.Invalid;
+                return true;
+
+            default:
+                parsed = PollSnapshotStatus.Active;
+                return false;
+        }
     }
 
     private static int TryGetInt(JsonElement element, string property)

@@ -15,7 +15,7 @@ public sealed class WasThereCommand(StreamSessionHistoryStore historyStore) : IC
 
     public Task<OutgoingMessage?> ExecuteAsync(CommandContext context, CancellationToken cancellationToken)
     {
-        var sessions = historyStore.Load().Sessions;
+        var sessions = historyStore.LoadVisible().Sessions;
 
         if (sessions.Count == 0)
         {

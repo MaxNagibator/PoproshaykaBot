@@ -18,6 +18,7 @@ public static class ObsChatRangesSchema
             ["emoteSizePixels"] = new(ObsChatRanges.EmoteSizeMin, ObsChatRanges.EmoteSizeMax, 1),
             ["badgeSizePixels"] = new(ObsChatRanges.BadgeSizeMin, ObsChatRanges.BadgeSizeMax, 1),
             ["userAvatarSizePixels"] = new(ObsChatRanges.UserAvatarSizeMin, ObsChatRanges.UserAvatarSizeMax, 1),
+            ["messageImageMaxHeightPixels"] = new(ObsChatRanges.MessageImageMaxHeightMin, ObsChatRanges.MessageImageMaxHeightMax, 10),
             ["scrollAnimationDuration"] = new(ObsChatRanges.ScrollAnimationDurationMin, ObsChatRanges.ScrollAnimationDurationMax, 50),
             ["scrollToBottomThreshold"] = new(ObsChatRanges.ScrollToBottomThresholdMin, ObsChatRanges.ScrollToBottomThresholdMax, 10),
             ["scrollPauseAfterUserMs"] = new(ObsChatRanges.ScrollPauseAfterUserMsMin, ObsChatRanges.ScrollPauseAfterUserMsMax, 100),

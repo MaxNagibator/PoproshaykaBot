@@ -200,6 +200,9 @@ PublishScripts/
 **/[Pp]ackages/*
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
+# except the root-level KeepShell local NuGet feed (committed intentionally: offline, reproducible)
+!/packages/
+!/packages/*.nupkg
 # Uncomment if necessary however generally it will be regenerated when needed
 #!**/[Pp]ackages/repositories.config
 # NuGet v3's project.json files produces more ignorable files
@@ -404,3 +407,6 @@ FodyWeavers.xsd
 
 # Локальные legacy-данные для ручных миграций (содержат секреты)
 old/
+
+# Отметка локальной сборки рядом с exe (scripts/write-build-stamp.ps1)
+build-stamp.json

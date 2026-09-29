@@ -2,6 +2,6 @@
 
 public enum TwitchOAuthRole
 {
-    Bot,
-    Broadcaster,
+    Bot = 0,
+    Broadcaster = 1,
 }

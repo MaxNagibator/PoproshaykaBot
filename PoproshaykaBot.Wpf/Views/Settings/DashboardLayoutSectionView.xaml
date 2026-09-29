@@ -1,0 +1,172 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Settings.DashboardLayoutSectionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Settings"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:DashboardLayoutSectionViewModel}"
+             d:DesignHeight="640"
+             d:DesignWidth="1000">
+
+    <DockPanel LastChildFill="True">
+        <TextBlock DockPanel.Dock="Top"
+                   Style="{StaticResource TextBlock.Subtle}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,16"
+                   Text="Превью показывает панель «Обзор» в масштабе окна. Колонки и строки задают саму сетку: новая колонка встаёт справа, новая строка – снизу, обе пустые, пока в них не положат плитку; при убавлении плитка, оставшаяся за краем, выключается и возвращается в палитру. Перетащите плитку из палитры на нужное место, тяните разделители, чтобы поменять пропорции. Правый клик по плитке – максимальные размеры и удаление." />
+
+        <TextBlock x:Name="NoticeText"
+                   DockPanel.Dock="Top"
+                   Text="{Binding Notice}"
+                   TextWrapping="Wrap"
+                   FontSize="{DynamicResource Font.Size.S}"
+                   keepshell:SeverityBrushBehavior.Foreground="Warning"
+                   Visibility="{Binding Notice, Converter={StaticResource NullToVisibility}}"
+                   AutomationProperties.LiveSetting="Assertive"
+                   Margin="0,0,0,16" />
+
+        <WrapPanel DockPanel.Dock="Top"
+                   Orientation="Horizontal"
+                   Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="0,0,24,8">
+                <TextBlock Text="Эталон"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <ComboBox MinWidth="170"
+                          VerticalAlignment="Center"
+                          ItemsSource="{Binding References}"
+                          SelectedItem="{Binding Reference, Mode=TwoWay}"
+                          DisplayMemberPath="Label" />
+                <TextBlock Text="{Binding ReferenceCaption}"
+                           Style="{StaticResource TextBlock.Subtle}"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="0,0,24,8">
+                <TextBlock Text="Колонки"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <Slider x:Name="ColumnSlider"
+                        Width="120"
+                        Minimum="{Binding MinColumnCount, Mode=OneTime}"
+                        Maximum="{Binding MaxColumnCount, Mode=OneTime}"
+                        Value="{Binding ColumnCount, Mode=TwoWay}"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Число колонок сетки" />
+                <TextBlock Text="{Binding ColumnCount}"
+                           VerticalAlignment="Center"
+                           MinWidth="16"
+                           Margin="8,0,0,0" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="0,0,24,8">
+                <TextBlock Text="Строки"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <Slider x:Name="RowSlider"
+                        Width="120"
+                        Minimum="{Binding MinRowCount, Mode=OneTime}"
+                        Maximum="{Binding MaxRowCount, Mode=OneTime}"
+                        Value="{Binding RowCount, Mode=TwoWay}"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Число строк сетки" />
+                <TextBlock Text="{Binding RowCount}"
+                           VerticalAlignment="Center"
+                           MinWidth="16"
+                           Margin="8,0,0,0" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="0,0,0,8">
+                <Button Content="Отменить"
+                        Style="{StaticResource Button.Secondary}"
+                        Command="{Binding UndoCommand}"
+                        Margin="0,0,8,0" />
+                <Button Content="Сбросить"
+                        Style="{StaticResource Button.Secondary}"
+                        Command="{Binding ResetLayoutCommand}" />
+            </StackPanel>
+        </WrapPanel>
+
+        <TextBlock DockPanel.Dock="Top"
+                   Text="{Binding StackNote}"
+                   Style="{StaticResource TextBlock.Subtle}"
+                   TextWrapping="Wrap"
+                   Visibility="{Binding StackNote, Converter={StaticResource NullToVisibility}}"
+                   Margin="0,-8,0,16" />
+
+        <Grid MinHeight="380">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="190" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Background="{DynamicResource Bg.Surface}"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="8"
+                    Margin="0,0,12,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Палитра"
+                               Style="{StaticResource TextBlock.Subtle}"
+                               Margin="0,0,0,8" />
+                    <ItemsControl ItemsSource="{Binding AvailablePalette}"
+                                  IsEnabled="{Binding CanEditTree}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Content="{Binding Title}"
+                                        Tag="{Binding TypeId}"
+                                        Style="{StaticResource Button.Secondary}"
+                                        HorizontalContentAlignment="Left"
+                                        HorizontalAlignment="Stretch"
+                                        Margin="0,0,0,6"
+                                        Padding="10,6"
+                                        Cursor="Hand"
+                                        PreviewMouseLeftButtonDown="OnPaletteMouseDown" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="1"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Background="{DynamicResource Bg.Base}"
+                    Padding="4"
+                    AllowDrop="True"
+                    DragOver="OnPreviewDragOver"
+                    DragLeave="OnPreviewDragLeave"
+                    Drop="OnPreviewDrop">
+                <Grid x:Name="PreviewArea"
+                      ClipToBounds="True">
+                    <Viewbox x:Name="PreviewBox"
+                             Stretch="Uniform"
+                             StretchDirection="Both"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Top" />
+                    <Canvas x:Name="PreviewOverlay"
+                            IsHitTestVisible="False" />
+                </Grid>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

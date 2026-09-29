@@ -27,11 +27,11 @@ public class PollProfilesManager(
         return pollsStore.Load().Profiles.ToList();
     }
 
-    public virtual void Upsert(PollProfile profile)
+    public virtual bool Upsert(PollProfile profile)
     {
         Validate(profile);
 
-        pollsStore.Mutate(polls =>
+        var written = pollsStore.Mutate(polls =>
         {
             var profiles = polls.Profiles;
 
@@ -58,9 +58,11 @@ public class PollProfilesManager(
 
         logger.LogDebug("Upsert профиля голосования {ProfileName} (Id={ProfileId})", profile.Name, profile.Id);
         _ = eventBus.PublishAsync(new PollProfilesChanged());
+
+        return written;
     }
 
-    public virtual void ReplaceAll(IEnumerable<PollProfile> profiles)
+    public virtual bool ReplaceAll(IEnumerable<PollProfile> profiles)
     {
         ArgumentNullException.ThrowIfNull(profiles);
 
@@ -87,7 +89,7 @@ public class PollProfilesManager(
             }
         }
 
-        pollsStore.Mutate(polls =>
+        var written = pollsStore.Mutate(polls =>
         {
             polls.Profiles.Clear();
             polls.Profiles.AddRange(snapshot);
@@ -95,11 +97,14 @@ public class PollProfilesManager(
 
         logger.LogInformation("ReplaceAll профилей голосований ({Count})", snapshot.Count);
         _ = eventBus.PublishAsync(new PollProfilesChanged());
+
+        return written;
     }
 
-    public virtual void Remove(Guid id)
+    public virtual bool Remove(Guid id)
     {
-        var removed = pollsStore.Mutate(polls => polls.Profiles.RemoveAll(p => p.Id == id));
+        var removed = 0;
+        var written = pollsStore.Mutate(polls => removed = polls.Profiles.RemoveAll(p => p.Id == id));
 
         if (removed > 0)
         {
@@ -107,10 +112,12 @@ public class PollProfilesManager(
         }
         else
         {
-            logger.LogDebug("Запрос на удаление профиля голосования Id={ProfileId} — записей не найдено", id);
+            logger.LogDebug("Запрос на удаление профиля голосования Id={ProfileId} – записей не найдено", id);
         }
 
         _ = eventBus.PublishAsync(new PollProfilesChanged());
+
+        return written;
     }
 
     private static void Validate(PollProfile profile)

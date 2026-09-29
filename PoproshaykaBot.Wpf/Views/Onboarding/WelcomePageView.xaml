@@ -1,0 +1,35 @@
+<UserControl x:Class="PoproshaykaBot.Wpf.Views.Onboarding.WelcomePageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Onboarding"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:WelcomePageViewModel}"
+             d:DesignHeight="376"
+             d:DesignWidth="688">
+
+    <StackPanel Margin="20,18">
+        <TextBlock Text="{Binding IntroText}"
+                   FontWeight="Bold"
+                   FontSize="{DynamicResource Font.Size.L}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,12" />
+
+        <TextBlock Text="{Binding BodyText}"
+                   Foreground="{DynamicResource Fg.Primary}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,12" />
+
+        <TextBlock Margin="0,0,0,16">
+            <Hyperlink Command="{Binding OpenDevConsoleCommand}"
+                       Foreground="{DynamicResource Fg.Link}">
+                Открыть Twitch Developer Console
+            </Hyperlink>
+        </TextBlock>
+
+        <TextBlock Text="{Binding HintText}"
+                   Foreground="{DynamicResource Fg.Secondary}"
+                   TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

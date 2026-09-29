@@ -58,7 +58,7 @@ sealed partial class ObsInfoWidget
         _sceneLabel.Name = "_sceneLabel";
         _sceneLabel.Size = new Size(308, 26);
         _sceneLabel.TabIndex = 0;
-        _sceneLabel.Text = "Сцена: —";
+        _sceneLabel.Text = "Сцена: –";
         _sceneLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // _outputsTableLayoutPanel

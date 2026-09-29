@@ -23,7 +23,7 @@ public sealed class TwitchAuthHandlerTests
 
         _oauthService = Substitute.For<ITwitchOAuthService>();
 
-        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance);
+        _settingsManager = Substitute.For<SettingsManager>(NullLogger<SettingsManager>.Instance, null, null);
         _settings = new()
         {
             Twitch =
@@ -125,10 +125,10 @@ public sealed class TwitchAuthHandlerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized),
-                "Auth-handler не глотает 401 — пробрасывает caller-у, чтобы тот видел и принимал решение");
+                "Auth-handler не глотает 401 – пробрасывает caller-у, чтобы тот видел и принимал решение");
 
             Assert.That(_accountsStore.LoadBot().AccessToken, Is.Empty,
-                "Сохранённый токен должен быть очищен — следующий вызов должен пройти через TwitchOAuthService");
+                "Сохранённый токен должен быть очищен – следующий вызов должен пройти через TwitchOAuthService");
         }
     }
 
@@ -153,6 +153,38 @@ public sealed class TwitchAuthHandlerTests
     }
 
     [Test]
+    public void Отказ_шёпота_по_401_не_стирает_токен_бота()
+    {
+        const string Token = "stored-token";
+        _accountsStore.Mutate(TwitchOAuthRole.Bot, account => account.AccessToken = Token);
+        _oauthService.GetAccessTokenAsync(TwitchOAuthRole.Bot, Arg.Any<CancellationToken>())
+            .Returns(Token);
+
+        var (client, stub) = BuildPipeline();
+        stub.Responder = _ => StubHttpMessageHandler.ReturnsJson(HttpStatusCode.Unauthorized,
+                """{"error":"Unauthorized","status":401,"message":"Missing scope: user:manage:whispers"}""")
+            .Responder!.Invoke(_);
+
+        var factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient(Arg.Any<string>()).Returns(client);
+        var helix = new BotHelixClient(factory, NullLogger<BotHelixClient>.Instance);
+
+        var exception = Assert.ThrowsAsync<HelixRequestException>(async () => await helix.SendWhisperAsync("42", "7", "hi"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+            Assert.That(exception.TwitchErrorMessage, Is.EqualTo("Missing scope: user:manage:whispers"));
+            Assert.That(stub.Requests[0].Method, Is.EqualTo(HttpMethod.Post));
+            Assert.That(stub.Requests[0].RequestUri!.PathAndQuery, Is.EqualTo("/helix/whispers?from_user_id=42&to_user_id=7"));
+            Assert.That(stub.RequestBodies[0], Is.EqualTo("""{"message":"hi"}"""));
+
+            Assert.That(_accountsStore.LoadBot().AccessToken, Is.EqualTo(Token),
+                "401 шёпота – это нет права или телефона у бота, а не негодный токен: иначе откат в реплай ушёл бы уже без авторизации");
+        }
+    }
+
+    [Test]
     public async Task SendAsync_On200_DoesNotTouchAccountsStore()
     {
         const string Token = "valid-token";
@@ -166,7 +198,7 @@ public sealed class TwitchAuthHandlerTests
         await client.GetAsync("helix/users");
 
         Assert.That(_accountsStore.LoadBot().AccessToken, Is.EqualTo(Token),
-            "Успешный ответ не должен дёргать TryClearAccessToken — токен валиден");
+            "Успешный ответ не должен дёргать TryClearAccessToken – токен валиден");
     }
 
     [Test]

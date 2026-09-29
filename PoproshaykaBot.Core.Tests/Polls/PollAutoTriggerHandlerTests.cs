@@ -18,7 +18,7 @@ public class PollAutoTriggerHandlerTests
         Directory.CreateDirectory(_tempDir);
 
         _polls = new();
-        _pollsStore = Substitute.For<PollsStore>(NullLogger<PollsStore>.Instance, null);
+        _pollsStore = Substitute.For<PollsStore>(NullLogger<PollsStore>.Instance, null, null);
         _pollsStore.Load().Returns(_polls);
 
         _profilesManager = Substitute.For<PollProfilesManager>(new PollsStore(filePath: Path.Combine(_tempDir, "polls.json")),

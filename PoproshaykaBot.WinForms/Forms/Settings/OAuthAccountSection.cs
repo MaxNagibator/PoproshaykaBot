@@ -507,7 +507,7 @@ public sealed partial class OAuthAccountSection : UserControl
         }
         else
         {
-            _accountLoginValueLabel.Text = "—";
+            _accountLoginValueLabel.Text = "–";
             _accountLoginValueLabel.ForeColor = Color.Gray;
         }
 

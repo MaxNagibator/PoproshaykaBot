@@ -34,6 +34,8 @@ public sealed class PointTermTests
     [TestCase(115, "баллов")]
     [TestCase(-1, "балл")]
     [TestCase(-5, "баллов")]
+    [TestCase(long.MinValue, "баллов")]
+    [TestCase(long.MaxValue, "баллов")]
     public void ForCount_ReturnsCorrectRussianForm(long count, string expected)
     {
         Assert.That(_term.ForCount(count), Is.EqualTo(expected));

@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFormFactory, FormFactory>();
 
         services.AddSingleton<BotConnectionManager>();
+        services.AddSingleton<IBotConnectionController>(provider => provider.GetRequiredService<BotConnectionManager>());
         services.AddSingleton<MainForm>();
 
         services.AddTransient<SettingsForm>();

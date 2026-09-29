@@ -1,5 +1,6 @@
 ﻿using Cyotek.Windows.Forms;
 using PoproshaykaBot.Core.Settings.Obs;
+using PoproshaykaBot.WinForms.Infrastructure;
 using System.Diagnostics;
 using System.Globalization;
 
@@ -494,6 +495,7 @@ public partial class ObsChatSettingsControl : UserControl
     private bool ShowColorPickerDialog(Button colorButton)
     {
         using var colorPickerDialog = new ColorPickerDialog();
+        OffScreenForm.PrepareIfHeadless(colorPickerDialog);
         colorPickerDialog.Color = colorButton.BackColor;
         colorPickerDialog.ShowAlphaChannel = true;
 

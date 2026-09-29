@@ -27,7 +27,7 @@ internal sealed class ChatHistoryEndpoint(
 
             var finalHistory = history
                 .TakeLast(maxMessages)
-                .Select(DtoMapper.ToServerMessage);
+                .Select(message => DtoMapper.ToServerMessage(message, obsSettings));
 
             return Results.Json(finalHistory, ServerJsonOptions.Default);
         });

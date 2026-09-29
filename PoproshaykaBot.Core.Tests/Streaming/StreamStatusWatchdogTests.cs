@@ -74,6 +74,6 @@ public sealed class StreamStatusWatchdogTests
         await _watchdog.StopAsync(NullProgress, CancellationToken.None);
 
         Assert.That(Volatile.Read(ref refreshCount), Is.EqualTo(snapshot),
-            "После переключения на Offline loop обязан тикать вхолостую — RefreshLiveSnapshotAsync не должен вызываться");
+            "После переключения на Offline loop обязан тикать вхолостую – RefreshLiveSnapshotAsync не должен вызываться");
     }
 }

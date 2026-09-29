@@ -1,4 +1,5 @@
-﻿using PoproshaykaBot.Core.Infrastructure.Events;
+﻿using PoproshaykaBot.Core.Debugging;
+using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Chat;
 using PoproshaykaBot.Core.Statistics;
 
@@ -8,21 +9,24 @@ public sealed class StatisticsTrackingHandler : IEventHandler<ChatMessageReceive
 {
     private readonly IUserStatisticsRepository _userStatistics;
     private readonly IBotStatisticsRepository _botStatistics;
+    private readonly ITargetChannelProvider _targetChannelProvider;
     private readonly IDisposable _subscription;
 
     public StatisticsTrackingHandler(
         IUserStatisticsRepository userStatistics,
         IBotStatisticsRepository botStatistics,
+        ITargetChannelProvider targetChannelProvider,
         IEventBus eventBus)
     {
         _userStatistics = userStatistics;
         _botStatistics = botStatistics;
+        _targetChannelProvider = targetChannelProvider;
         _subscription = eventBus.Subscribe(this);
     }
 
     public Task HandleAsync(ChatMessageReceived @event, CancellationToken cancellationToken)
     {
-        if (@event.IsBot)
+        if (@event.IsBot || !_targetChannelProvider.Current.RecordsUserData)
         {
             return Task.CompletedTask;
         }

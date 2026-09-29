@@ -16,7 +16,7 @@ public class StreamEpisodeNumbererTests
         Directory.CreateDirectory(_tempDir);
 
         _broadcastProfiles = new();
-        _profilesStore = Substitute.For<BroadcastProfilesStore>(NullLogger<BroadcastProfilesStore>.Instance, null);
+        _profilesStore = Substitute.For<BroadcastProfilesStore>(NullLogger<BroadcastProfilesStore>.Instance, null, null);
         _profilesStore.Load().Returns(_broadcastProfiles);
 
         _profilesManager = Substitute.For<BroadcastProfilesManager>(new BroadcastProfilesStore(filePath: Path.Combine(_tempDir, "broadcast-profiles.json")),

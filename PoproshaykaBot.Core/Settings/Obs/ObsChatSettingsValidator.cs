@@ -36,6 +36,11 @@ public static class ObsChatSettingsValidator
             ShowUserAvatars = source.ShowUserAvatars,
             UserAvatarSizePixels = ObsChatRanges.Clamp(source.UserAvatarSizePixels, ObsChatRanges.UserAvatarSizeMin, ObsChatRanges.UserAvatarSizeMax),
 
+            ShowMessageImages = source.ShowMessageImages,
+            MessageImageRoles = NormalizeRoles(source.MessageImageRoles),
+            MessageImageAllowedHosts = MessageImageHosts.Normalize(source.MessageImageAllowedHosts),
+            MessageImageMaxHeightPixels = ObsChatRanges.Clamp(source.MessageImageMaxHeightPixels, ObsChatRanges.MessageImageMaxHeightMin, ObsChatRanges.MessageImageMaxHeightMax),
+
             ShowUserTypeBorders = source.ShowUserTypeBorders,
             HighlightFirstTimeUsers = source.HighlightFirstTimeUsers,
             HighlightMentions = source.HighlightMentions,
@@ -59,6 +64,17 @@ public static class ObsChatSettingsValidator
             FadeOutAnimationType = NormalizeAnimation(source.FadeOutAnimationType, MessageAnimationType.ExitValues, MessageAnimationType.FadeOut),
             FadeOutAnimationDurationMs = ObsChatRanges.Clamp(source.FadeOutAnimationDurationMs, ObsChatRanges.FadeOutAnimationDurationMin, ObsChatRanges.FadeOutAnimationDurationMax),
         };
+    }
+
+    private static MessageImageSenderRoles NormalizeRoles(MessageImageSenderRoles source)
+    {
+        const MessageImageSenderRoles Known = MessageImageSenderRoles.Broadcaster
+            | MessageImageSenderRoles.Moderator
+            | MessageImageSenderRoles.Vip
+            | MessageImageSenderRoles.Subscriber
+            | MessageImageSenderRoles.Everyone;
+
+        return source & Known;
     }
 
     private static string NormalizeAnimation(string? incoming, IReadOnlyList<string> allowed, string fallback)

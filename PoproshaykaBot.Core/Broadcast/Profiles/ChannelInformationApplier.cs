@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Broadcasting;
 using PoproshaykaBot.Core.Twitch;
@@ -9,6 +10,7 @@ namespace PoproshaykaBot.Core.Broadcast.Profiles;
 public sealed class ChannelInformationApplier(
     ITwitchChannelsApi channelsApi,
     IBroadcasterIdProvider idProvider,
+    ITargetChannelProvider targetChannelProvider,
     IChannelUpdateConfirmation confirmation,
     IEventBus eventBus,
     ILogger<ChannelInformationApplier> logger)
@@ -16,8 +18,18 @@ public sealed class ChannelInformationApplier(
 {
     private static readonly TimeSpan ConfirmationTimeout = TimeSpan.FromSeconds(8);
 
+    private const string ForeignChannelMessage = "Идёт отладка на чужом канале – название и категорию менять нельзя.";
+
     public async Task<bool> ApplyAsync(BroadcastProfile profile, CancellationToken cancellationToken)
     {
+        if (targetChannelProvider.Current.IsForeign)
+        {
+            logger.LogInformation("Профиль {Profile} не применён: {Reason}", profile.Name, ForeignChannelMessage);
+            await eventBus.PublishAsync(new BroadcastProfileApplyFailed(profile, ForeignChannelMessage), cancellationToken);
+
+            return false;
+        }
+
         var broadcasterId = await idProvider.GetAsync(cancellationToken);
 
         if (broadcasterId == null)
@@ -65,6 +77,15 @@ public sealed class ChannelInformationApplier(
 
     public async Task<bool> ApplyPatchAsync(string? title, string? gameId, string? gameName, CancellationToken cancellationToken)
     {
+        if (targetChannelProvider.Current.IsForeign)
+        {
+            logger.LogInformation("Патч канала не применён: {Reason}", ForeignChannelMessage);
+            await eventBus.PublishAsync(new ChannelInformationPatchFailed(title, gameId, gameName, ForeignChannelMessage),
+                cancellationToken);
+
+            return false;
+        }
+
         var broadcasterId = await idProvider.GetAsync(cancellationToken);
 
         if (broadcasterId == null)

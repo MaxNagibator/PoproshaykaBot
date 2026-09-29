@@ -47,7 +47,7 @@ public sealed class BotUserIdProvider : IBotUserIdProvider, IDisposable
 
             if (user == null)
             {
-                _logger.LogWarning("Bot user не получен через /users — ответ пустой");
+                _logger.LogWarning("Bot user не получен через /users – ответ пустой");
                 return null;
             }
 

@@ -85,7 +85,7 @@ sealed partial class BroadcastInfoWidget
         _nextTimeLabel.Name = "_nextTimeLabel";
         _nextTimeLabel.Size = new Size(248, 28);
         _nextTimeLabel.TabIndex = 3;
-        _nextTimeLabel.Text = "Следующая: —";
+        _nextTimeLabel.Text = "Следующая: –";
         _nextTimeLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // BroadcastInfoWidget

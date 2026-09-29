@@ -239,7 +239,7 @@ public partial class OnboardingWizardForm : Form
             return;
         }
 
-        _settingsManager.Current.Twitch.Channel = _originalChannel;
+        _settingsManager.UpdateCurrent(settings => settings.Twitch.Channel = _originalChannel);
         _logger.LogInformation("Канал откачен на исходное значение «{Channel}» после отмены мастера", _originalChannel);
     }
 
@@ -252,8 +252,7 @@ public partial class OnboardingWizardForm : Form
 
         _rollbackPerformed = true;
 
-        var liveSettings = _settingsManager.Current;
-        var currentPort = liveSettings.Twitch.HttpServerPort;
+        var currentPort = _settingsManager.Current.Twitch.HttpServerPort;
 
         if (currentPort == _originalHttpServerPort)
         {
@@ -267,7 +266,7 @@ public partial class OnboardingWizardForm : Form
                 await _kestrelHttpServer.StopAsync();
             }
 
-            liveSettings.Twitch.HttpServerPort = _originalHttpServerPort;
+            _settingsManager.UpdateCurrent(settings => settings.Twitch.HttpServerPort = _originalHttpServerPort);
 
             await _kestrelHttpServer.StartAsync();
 

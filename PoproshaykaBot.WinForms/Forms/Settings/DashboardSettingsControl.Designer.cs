@@ -154,7 +154,7 @@ partial class DashboardSettingsControl
         _infoLabel.Name = "_infoLabel";
         _infoLabel.Size = new Size(580, 30);
         _infoLabel.TabIndex = 1;
-        _infoLabel.Text = "ℹ️ Перетащите плитку из палитры в нужную ячейку. Перетащите плитку из сетки, чтобы переместить. Правый клик по плитке — меню (размер, удалить).";
+        _infoLabel.Text = "ℹ️ Перетащите плитку из палитры в нужную ячейку. Перетащите плитку из сетки, чтобы переместить. Правый клик по плитке – меню (размер, удалить).";
         //
         // _editorTableLayoutPanel
         //

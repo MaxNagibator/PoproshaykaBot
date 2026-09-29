@@ -13,7 +13,7 @@ public partial class PollProfileEditDialog : Form
 
         _autoTriggerComboBox.Items.Clear();
         _autoTriggerComboBox.Items.AddRange([
-            new AutoTriggerChoice(PollAutoTriggerEvent.None, "— нет —"),
+            new AutoTriggerChoice(PollAutoTriggerEvent.None, "– нет –"),
             new AutoTriggerChoice(PollAutoTriggerEvent.StreamOnline, "При начале стрима"),
             new AutoTriggerChoice(PollAutoTriggerEvent.BroadcastProfileApplied, "При применении профиля трансляции"),
         ]);

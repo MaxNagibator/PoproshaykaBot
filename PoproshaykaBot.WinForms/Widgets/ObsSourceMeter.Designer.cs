@@ -54,7 +54,7 @@ sealed partial class ObsSourceMeter
         _stateLabel.Name = "_stateLabel";
         _stateLabel.Size = new Size(280, 24);
         _stateLabel.TabIndex = 0;
-        _stateLabel.Text = "—";
+        _stateLabel.Text = "–";
         _stateLabel.TextAlign = ContentAlignment.MiddleCenter;
         //
         // _volumeMeterPanel
@@ -89,7 +89,7 @@ sealed partial class ObsSourceMeter
         _detailLabel.Name = "_detailLabel";
         _detailLabel.Size = new Size(280, 22);
         _detailLabel.TabIndex = 2;
-        _detailLabel.Text = "—";
+        _detailLabel.Text = "–";
         _detailLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // ObsSourceMeter

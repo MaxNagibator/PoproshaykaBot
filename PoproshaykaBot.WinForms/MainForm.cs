@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using PoproshaykaBot.Core.Chat;
+using PoproshaykaBot.Core.Debugging;
 using PoproshaykaBot.Core.Infrastructure.Events;
 using PoproshaykaBot.Core.Infrastructure.Events.Lifecycle;
 using PoproshaykaBot.Core.Infrastructure.Events.Streaming;
@@ -16,6 +17,7 @@ using PoproshaykaBot.WinForms.Forms.Onboarding;
 using PoproshaykaBot.WinForms.Forms.Settings;
 using PoproshaykaBot.WinForms.Forms.StreamHistory;
 using PoproshaykaBot.WinForms.Forms.Users;
+using PoproshaykaBot.WinForms.Infrastructure;
 using PoproshaykaBot.WinForms.Infrastructure.Di;
 
 namespace PoproshaykaBot.WinForms;
@@ -29,6 +31,7 @@ public partial class MainForm : Form
     private readonly DashboardLayoutStore _dashboardLayoutStore;
     private readonly BotConnectionManager _connectionManager;
     private readonly OnboardingChecklist _onboardingChecklist;
+    private readonly ITargetChannelProvider _targetChannelProvider;
     private readonly IUpdateCoordinator _updateCoordinator;
     private readonly ILogger<MainForm> _logger;
     private readonly List<IDisposable> _subs = [];
@@ -55,6 +58,7 @@ public partial class MainForm : Form
         SettingsManager settingsManager,
         DashboardLayoutStore dashboardLayoutStore,
         OnboardingChecklist onboardingChecklist,
+        ITargetChannelProvider targetChannelProvider,
         IUpdateCoordinator updateCoordinator,
         ILogger<MainForm> logger)
     {
@@ -65,6 +69,7 @@ public partial class MainForm : Form
         _settingsManager = settingsManager;
         _dashboardLayoutStore = dashboardLayoutStore;
         _onboardingChecklist = onboardingChecklist;
+        _targetChannelProvider = targetChannelProvider;
         _updateCoordinator = updateCoordinator;
         _logger = logger;
 
@@ -74,6 +79,8 @@ public partial class MainForm : Form
 
         RestoreWindowBounds();
     }
+
+    protected override bool ShowWithoutActivation => Program.IsUiSmoke;
 
     protected override void OnHandleCreated(EventArgs e)
     {
@@ -98,6 +105,7 @@ public partial class MainForm : Form
         OpenOnboardingWizardIfNeeded();
         RefreshOnboardingBanner();
         RefreshUpdateBanner();
+        RefreshDebugBanner();
         _logger.LogInformation("Приложение запущено. Нажмите 'Подключить бота' для начала работы.");
 
         KeyPreview = true;
@@ -192,6 +200,7 @@ public partial class MainForm : Form
     {
         LoadSettings(reloadDashboard: true);
         RefreshOnboardingBanner();
+        RefreshDebugBanner();
         _logger.LogInformation("Настройки обновлены.");
     }
 
@@ -370,6 +379,32 @@ public partial class MainForm : Form
 
         _onboardingBannerLabel.Text = $"⚠ Бот не готов к работе. Не настроено: {string.Join(", ", missing)}.";
         _onboardingBannerPanel.Visible = true;
+    }
+
+    private void RefreshDebugBanner()
+    {
+        var target = _targetChannelProvider.Current;
+
+        if (!target.IsDebugSession)
+        {
+            _debugBannerPanel.Visible = false;
+            return;
+        }
+
+        if (target.IsSendingAllowed)
+        {
+            _debugBannerPanel.BackColor = Color.MistyRose;
+            _debugBannerLabel.ForeColor = Color.Firebrick;
+            _debugBannerLabel.Text = $"🐞 Отладка: бот подключается к каналу {target.Login} и пишет в его чат.";
+        }
+        else
+        {
+            _debugBannerPanel.BackColor = Color.LightCyan;
+            _debugBannerLabel.ForeColor = Color.Teal;
+            _debugBannerLabel.Text = $"🐞 Отладка: бот читает чат канала {target.Login}. Сообщения не отправляются – они видны в журнале.";
+        }
+
+        _debugBannerPanel.Visible = true;
     }
 
     private void RefreshUpdateBanner()
@@ -627,6 +662,12 @@ public partial class MainForm : Form
 
     private void RestoreWindowBounds()
     {
+        if (Program.IsUiSmoke)
+        {
+            OffScreenForm.PrepareIfHeadless(this);
+            return;
+        }
+
         var saved = _dashboardLayoutStore.LoadMainWindow();
 
         if (saved is null || saved.Width <= 0 || saved.Height <= 0)
@@ -652,6 +693,11 @@ public partial class MainForm : Form
 
     private void SaveWindowBounds()
     {
+        if (Program.IsUiSmoke)
+        {
+            return;
+        }
+
         var isMaximized = WindowState == FormWindowState.Maximized;
         var bounds = isMaximized || WindowState == FormWindowState.Minimized
             ? RestoreBounds

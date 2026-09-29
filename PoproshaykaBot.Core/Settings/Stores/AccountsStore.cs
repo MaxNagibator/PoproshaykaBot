@@ -1,9 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using PoproshaykaBot.Core.Infrastructure;
-using PoproshaykaBot.Core.Infrastructure.Persistence;
 using PoproshaykaBot.Core.Twitch.Auth;
 using PoproshaykaBot.Core.Twitch.Chat;
-using System.Text.Json;
 
 namespace PoproshaykaBot.Core.Settings.Stores;
 
@@ -11,27 +9,23 @@ public sealed class AccountsStore
 {
     private readonly ILogger<AccountsStore>? _logger;
     private readonly string _filePath;
-    private readonly object _syncLock = new();
+    private readonly JsonStore<AccountsFileDto> _store;
 
-    private TwitchAccountSettings _bot;
-    private TwitchAccountSettings _broadcaster;
-
-    public AccountsStore(ILogger<AccountsStore>? logger = null, string? filePath = null)
+    public AccountsStore(ILogger<AccountsStore>? logger = null, string? filePath = null, SettingsWriteGate? gate = null)
     {
         _logger = logger;
         _filePath = filePath ?? AppPaths.SettingsFile("accounts.json");
+        _store = new(_filePath, logger, AccountsTokenRedactor.Redact, describe: DescribeAccounts, gate: gate);
 
-        var dto = ReadFile();
-        _bot = dto.BotAccount ?? new();
-        _broadcaster = dto.BroadcasterAccount ?? new();
+        if (logger?.IsEnabled(LogLevel.Debug) == true)
+        {
+            var state = _store.Load();
 
-        ApplyScopeDefaults(_bot, TwitchScopes.BotRequired);
-        ApplyScopeDefaults(_broadcaster, TwitchScopes.BroadcasterRequired);
-
-        _logger?.LogDebug("AccountsStore инициализирован из {FilePath} (bot.login={BotLogin}, broadcaster.login={BroadcasterLogin})",
-            _filePath,
-            string.IsNullOrEmpty(_bot.Login) ? "—" : _bot.Login,
-            string.IsNullOrEmpty(_broadcaster.Login) ? "—" : _broadcaster.Login);
+            logger.LogDebug("AccountsStore инициализирован из {FilePath} (bot.login={BotLogin}, broadcaster.login={BroadcasterLogin})",
+                _filePath,
+                string.IsNullOrEmpty(state.BotAccount?.Login) ? "–" : state.BotAccount.Login,
+                string.IsNullOrEmpty(state.BroadcasterAccount?.Login) ? "–" : state.BroadcasterAccount.Login);
+        }
     }
 
     public TwitchAccountSettings LoadBot()
@@ -46,69 +40,91 @@ public sealed class AccountsStore
 
     public TwitchAccountSettings Load(TwitchOAuthRole role)
     {
-        lock (_syncLock)
-        {
-            return JsonStoreClone.DeepClone(GetAccountUnsafe(role));
-        }
+        return TakeAccount(_store.Load(), role);
     }
 
     public void Mutate(TwitchOAuthRole role, Action<TwitchAccountSettings> mutator)
     {
         ArgumentNullException.ThrowIfNull(mutator);
 
-        lock (_syncLock)
-        {
-            var account = GetAccountUnsafe(role);
-            mutator(account);
-            PersistInternal();
+        var written = _store.Mutate(state => mutator(TakeAccount(state, role)));
 
-            _logger?.LogDebug("AccountsStore: применена мутация для роли {Role}, состояние сохранено в {FilePath}",
-                role,
-                _filePath);
-        }
+        _logger?.LogDebug("AccountsStore: применена мутация для роли {Role}, {Outcome}",
+            role,
+            written ? $"состояние сохранено в {_filePath}" : "состояние принято только в памяти до перезапуска");
     }
 
     public bool TryClearAccessToken(TwitchOAuthRole role, string expectedToken)
     {
         ArgumentNullException.ThrowIfNull(expectedToken);
 
-        lock (_syncLock)
+        var cleared = _store.MutateIf(state =>
         {
-            var account = GetAccountUnsafe(role);
+            var account = TakeAccount(state, role);
 
             if (!string.Equals(account.AccessToken, expectedToken, StringComparison.Ordinal))
             {
-                _logger?.LogDebug("AccountsStore.TryClearAccessToken: токен роли {Role} уже изменился — очистка пропущена",
-                    role);
-
                 return false;
             }
 
             account.AccessToken = string.Empty;
             account.AccessTokenExpiresAt = null;
-            PersistInternal();
-
-            _logger?.LogInformation("AccountsStore: access-токен роли {Role} очищён по запросу 401-обработчика",
-                role);
-
             return true;
+        });
+
+        if (cleared)
+        {
+            _logger?.LogInformation("AccountsStore: access-токен роли {Role} очищён по запросу 401-обработчика", role);
         }
+        else
+        {
+            _logger?.LogDebug("AccountsStore.TryClearAccessToken: токен роли {Role} уже изменился – очистка пропущена", role);
+        }
+
+        return cleared;
     }
 
-    public void SaveAll(TwitchAccountSettings bot, TwitchAccountSettings broadcaster)
+    public bool SaveAll(TwitchAccountSettings bot, TwitchAccountSettings broadcaster)
     {
         ArgumentNullException.ThrowIfNull(bot);
         ArgumentNullException.ThrowIfNull(broadcaster);
 
-        lock (_syncLock)
+        var written = _store.Save(new()
         {
-            _bot = JsonStoreClone.DeepClone(bot);
-            _broadcaster = JsonStoreClone.DeepClone(broadcaster);
-            PersistInternal();
+            BotAccount = bot,
+            BroadcasterAccount = broadcaster,
+        });
 
-            _logger?.LogInformation("AccountsStore: оба аккаунта заменены целиком и сохранены в {FilePath}",
-                _filePath);
+        if (written)
+        {
+            _logger?.LogInformation("AccountsStore: оба аккаунта заменены целиком и сохранены в {FilePath}", _filePath);
+            return true;
         }
+
+        _logger?.LogInformation("AccountsStore: оба аккаунта заменены в памяти до перезапуска, файл {FilePath} переписан снаружи", _filePath);
+        return false;
+    }
+
+    private static string DescribeAccounts(AccountsFileDto state)
+    {
+        return $"бот – {SettingsDescriber.Describe(state.BotAccount ?? new())}; "
+            + $"вещатель – {SettingsDescriber.Describe(state.BroadcasterAccount ?? new())}";
+    }
+
+    private static TwitchAccountSettings TakeAccount(AccountsFileDto state, TwitchOAuthRole role)
+    {
+        if (role is not (TwitchOAuthRole.Bot or TwitchOAuthRole.Broadcaster))
+        {
+            throw new ArgumentOutOfRangeException(nameof(role), role, null);
+        }
+
+        var bot = state.BotAccount ??= new();
+        var broadcaster = state.BroadcasterAccount ??= new();
+
+        ApplyScopeDefaults(bot, TwitchScopes.BotRequired);
+        ApplyScopeDefaults(broadcaster, TwitchScopes.BroadcasterRequired);
+
+        return role == TwitchOAuthRole.Bot ? bot : broadcaster;
     }
 
     private static void ApplyScopeDefaults(TwitchAccountSettings account, IReadOnlyList<string> defaultScopes)
@@ -116,49 +132,6 @@ public sealed class AccountsStore
         if (account.Scopes.Length == 0)
         {
             account.Scopes = [..defaultScopes];
-        }
-    }
-
-    private TwitchAccountSettings GetAccountUnsafe(TwitchOAuthRole role)
-    {
-        return role switch
-        {
-            TwitchOAuthRole.Bot => _bot,
-            TwitchOAuthRole.Broadcaster => _broadcaster,
-            _ => throw new ArgumentOutOfRangeException(nameof(role), role, null),
-        };
-    }
-
-    private void PersistInternal()
-    {
-        var dto = new AccountsFileDto
-        {
-            BotAccount = _bot,
-            BroadcasterAccount = _broadcaster,
-        };
-
-        var json = JsonSerializer.Serialize(dto, JsonStoreOptions.Default);
-        AtomicFile.Save(_filePath, json, _logger);
-    }
-
-    private AccountsFileDto ReadFile()
-    {
-        if (!File.Exists(_filePath))
-        {
-            _logger?.LogDebug("AccountsStore: файл {FilePath} не найден, используются дефолты", _filePath);
-            return new();
-        }
-
-        try
-        {
-            var json = File.ReadAllText(_filePath);
-            return JsonSerializer.Deserialize<AccountsFileDto>(json, JsonStoreOptions.Default) ?? new();
-        }
-        catch (Exception exception)
-        {
-            _logger?.LogError(exception, "Ошибка чтения {FilePath}, применяются дефолты", _filePath);
-            JsonStoreBackup.CreateBackup(_filePath, "invalid", _logger, AccountsTokenRedactor.Redact);
-            return new();
         }
     }
 

@@ -50,6 +50,7 @@
         ['cfg-emoteSizePixels', 'emoteSizePixels'],
         ['cfg-badgeSizePixels', 'badgeSizePixels'],
         ['cfg-userAvatarSizePixels', 'userAvatarSizePixels'],
+        ['cfg-messageImageMaxHeightPixels', 'messageImageMaxHeightPixels'],
         ['cfg-scrollAnimationDuration', 'scrollAnimationDuration'],
         ['cfg-scrollToBottomThreshold', 'scrollToBottomThreshold'],
         ['cfg-scrollPauseAfterUserMs', 'scrollPauseAfterUserMs'],
@@ -332,6 +333,28 @@
                 settings[settingKey] = el.value;
                 onChange();
             });
+        } else if (kind === 'flags') {
+            const selected = String(settings[settingKey] || '')
+                .split(/[,\s]+/)
+                .filter(name => name.length > 0);
+            Array.from(el.options).forEach(option => {
+                option.selected = selected.indexOf(option.value) !== -1;
+            });
+            el.addEventListener('change', () => {
+                const names = Array.from(el.selectedOptions).map(option => option.value);
+                settings[settingKey] = names.length > 0 ? names.join(', ') : 'None';
+                onChange();
+            });
+        } else if (kind === 'lines') {
+            const current = Array.isArray(settings[settingKey]) ? settings[settingKey] : [];
+            el.value = current.join('\n');
+            el.addEventListener('input', () => {
+                settings[settingKey] = el.value
+                    .split(/[\r\n,;\s]+/)
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0);
+                onChange();
+            });
         }
     }
 
@@ -348,6 +371,10 @@
         bindControl('cfg-badgeSizePixels', 'badgeSizePixels', 'range');
         bindControl('cfg-showUserAvatars', 'showUserAvatars', 'checkbox');
         bindControl('cfg-userAvatarSizePixels', 'userAvatarSizePixels', 'range');
+        bindControl('cfg-showMessageImages', 'showMessageImages', 'checkbox');
+        bindControl('cfg-messageImageRoles', 'messageImageRoles', 'flags');
+        bindControl('cfg-messageImageAllowedHosts', 'messageImageAllowedHosts', 'lines');
+        bindControl('cfg-messageImageMaxHeightPixels', 'messageImageMaxHeightPixels', 'range');
         bindControl('cfg-showUserTypeBorders', 'showUserTypeBorders', 'checkbox');
         bindControl('cfg-highlightFirstTimeUsers', 'highlightFirstTimeUsers', 'checkbox');
         bindControl('cfg-highlightMentions', 'highlightMentions', 'checkbox');

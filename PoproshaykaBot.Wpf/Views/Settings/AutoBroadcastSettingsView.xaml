@@ -1,0 +1,101 @@
+﻿<UserControl x:Class="PoproshaykaBot.Wpf.Views.Settings.AutoBroadcastSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PoproshaykaBot.Wpf.ViewModels.Settings"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:keepshell="https://schemas.keepshell.dev/wpf"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:AutoBroadcastSettingsViewModel}"
+             d:DesignHeight="600"
+             d:DesignWidth="600">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/PoproshaykaBot.Wpf;component/Views/Settings/SettingsResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="MultilineRowLabel"
+                   TargetType="TextBlock"
+                   BasedOn="{StaticResource Setting.RowLabel}">
+                <Setter Property="VerticalAlignment"
+                        Value="Top" />
+                <Setter Property="Margin"
+                        Value="0,9,12,0" />
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <StackPanel>
+        <CheckBox Content="Включить автоматическое управление рассылкой"
+                  IsChecked="{Binding AutoBroadcastEnabled, Mode=TwoWay}"
+                  Style="{StaticResource CheckBox.Default}"
+                  Margin="0,0,0,8" />
+        <TextBlock Text="ℹ️ Автоматическое управление использует EventSub WebSocket для отслеживания статуса стрима. Рассылка будет автоматически запускаться при начале стрима и останавливаться при его завершении."
+                   Style="{StaticResource TextBlock.Subtle}"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource Fg.Muted}" />
+
+        <TextBlock Text="Уведомления о статусе стрима"
+                   Style="{StaticResource Setting.GroupHeading}" />
+        <CheckBox Content="Отправлять уведомления о статусе стрима в чат"
+                  IsChecked="{Binding StreamStatusNotificationsEnabled, Mode=TwoWay}"
+                  Style="{StaticResource CheckBox.Default}"
+                  Margin="0,0,0,12" />
+
+        <StackPanel Style="{StaticResource Setting.DependentBlock}"
+                    IsEnabled="{Binding StreamStatusNotificationsEnabled}">
+            <DockPanel Margin="0,0,0,8">
+                <TextBlock Text="При запуске стрима"
+                           Style="{StaticResource Setting.RowLabel}" />
+                <TextBox Text="{Binding StreamStartMessage, Mode=TwoWay}"
+                         Style="{StaticResource TextBox.Form}"
+                         AutomationProperties.Name="Сообщение при запуске стрима"
+                         keepshell:PlaceholderBehavior.Placeholder="{Binding StreamStartMessagePlaceholder}" />
+            </DockPanel>
+
+            <DockPanel Margin="0,0,0,8">
+                <TextBlock Text="При остановке стрима"
+                           Style="{StaticResource Setting.RowLabel}" />
+                <TextBox Text="{Binding StreamStopMessage, Mode=TwoWay}"
+                         Style="{StaticResource TextBox.Form}"
+                         AutomationProperties.Name="Сообщение при остановке стрима"
+                         keepshell:PlaceholderBehavior.Placeholder="{Binding StreamStopMessagePlaceholder}" />
+            </DockPanel>
+
+            <DockPanel>
+                <TextBlock Text="Статистика по завершении"
+                           Style="{StaticResource MultilineRowLabel}" />
+                <TextBox Text="{Binding StreamEndStatsMessage, Mode=TwoWay}"
+                         Style="{StaticResource TextBox.Form}"
+                         AutomationProperties.Name="Сообщение со статистикой по завершении стрима"
+                         keepshell:PlaceholderBehavior.Placeholder="{Binding StreamEndStatsMessagePlaceholder}"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         Height="70" />
+            </DockPanel>
+            <TextBlock Text="Подстановки: {duration}, {messages}, {chatters}, {peakViewers}, {avgViewers}, {title}, {game}, {channel}."
+                       Style="{StaticResource Form.Hint}"
+                       Margin="200,6,0,0" />
+        </StackPanel>
+
+        <TextBlock Text="Периодическая рассылка"
+                   Style="{StaticResource Setting.GroupHeading}" />
+        <keepshell:NumericSettingField Label="Интервал рассылки, мин"
+                                       Value="{Binding BroadcastIntervalMinutes, Mode=TwoWay}"
+                                       Margin="0,0,0,8" />
+        <DockPanel>
+            <TextBlock Text="Шаблон сообщения"
+                       Style="{StaticResource MultilineRowLabel}" />
+            <TextBox Text="{Binding BroadcastMessageTemplate, Mode=TwoWay}"
+                     Style="{StaticResource TextBox.Form}"
+                     AutomationProperties.Name="Шаблон сообщения рассылки"
+                     keepshell:PlaceholderBehavior.Placeholder="{Binding BroadcastMessageTemplatePlaceholder}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     Height="70" />
+        </DockPanel>
+    </StackPanel>
+</UserControl>

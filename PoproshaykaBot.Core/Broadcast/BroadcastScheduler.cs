@@ -19,6 +19,8 @@ public sealed class BroadcastScheduler(
 {
     private readonly object _stateLock = new();
     private int _sentMessagesCount;
+    private DateTimeOffset? _lastBroadcastAt;
+    private string? _lastError;
 
     private TimeSpan _interval = TimeSpan.FromMinutes(15);
     private PeriodicTimer? _timer;
@@ -31,6 +33,39 @@ public sealed class BroadcastScheduler(
 
     public int SentMessagesCount => _sentMessagesCount;
     public DateTime? NextBroadcastTime { get; private set; }
+
+    public TimeSpan Interval
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _interval;
+            }
+        }
+    }
+
+    public DateTimeOffset? LastBroadcastAt
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _lastBroadcastAt;
+            }
+        }
+    }
+
+    public string? LastError
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _lastError;
+            }
+        }
+    }
 
     public void Start(string channel)
     {
@@ -45,6 +80,7 @@ public sealed class BroadcastScheduler(
         lock (_stateLock)
         {
             _channel = channel;
+            _lastError = null;
             Interlocked.Exchange(ref _sentMessagesCount, 0);
 
             var minutes = Math.Max(1, settingsManager.Current.Twitch.AutoBroadcast.BroadcastIntervalMinutes);
@@ -110,6 +146,11 @@ public sealed class BroadcastScheduler(
 
         messenger.Send(message);
         logger.LogInformation("Сообщение отправлено вручную в канал {Channel}. Всего отправлено: {SentMessagesCount}", currentChannel, newCount);
+
+        lock (_stateLock)
+        {
+            _lastBroadcastAt = timeProvider.GetUtcNow();
+        }
 
         PublishStateChanged();
         return Task.CompletedTask;
@@ -222,6 +263,7 @@ public sealed class BroadcastScheduler(
                 lock (_stateLock)
                 {
                     NextBroadcastTime = timeProvider.GetLocalNow().DateTime + _interval;
+                    _lastBroadcastAt = timeProvider.GetUtcNow();
                 }
 
                 PublishStateChanged();
@@ -233,6 +275,11 @@ public sealed class BroadcastScheduler(
         }
         catch (Exception ex)
         {
+            lock (_stateLock)
+            {
+                _lastError = ex.Message;
+            }
+
             logger.LogError(ex, "Критическая ошибка в фоновом цикле рассылки для канала {Channel}", loopChannel);
         }
 
@@ -251,6 +298,6 @@ public sealed class BroadcastScheduler(
             nextBroadcast = NextBroadcastTime;
         }
 
-        _ = eventBus.PublishAsync(new BroadcastSchedulerStateChanged(IsActive, channel, sentMessages, nextBroadcast));
+        _ = eventBus.PublishAsync(new BroadcastSchedulerStateChanged(IsActive, channel, sentMessages, nextBroadcast), CancellationToken.None);
     }
 }

@@ -262,7 +262,7 @@ sealed partial class StreamHistoryForm
         labelTitle.Name = "labelTitle";
         labelTitle.Size = new Size(328, 24);
         labelTitle.TabIndex = 0;
-        labelTitle.Text = "📝 Заголовок: —";
+        labelTitle.Text = "📝 Заголовок: –";
         labelTitle.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelGame
@@ -273,7 +273,7 @@ sealed partial class StreamHistoryForm
         labelGame.Name = "labelGame";
         labelGame.Size = new Size(328, 24);
         labelGame.TabIndex = 1;
-        labelGame.Text = "🎮 Игра: —";
+        labelGame.Text = "🎮 Игра: –";
         labelGame.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelStarted
@@ -283,7 +283,7 @@ sealed partial class StreamHistoryForm
         labelStarted.Name = "labelStarted";
         labelStarted.Size = new Size(328, 24);
         labelStarted.TabIndex = 2;
-        labelStarted.Text = "▶ Начало: —";
+        labelStarted.Text = "▶ Начало: –";
         labelStarted.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelEnded
@@ -293,7 +293,7 @@ sealed partial class StreamHistoryForm
         labelEnded.Name = "labelEnded";
         labelEnded.Size = new Size(328, 24);
         labelEnded.TabIndex = 3;
-        labelEnded.Text = "⏹ Окончание: —";
+        labelEnded.Text = "⏹ Окончание: –";
         labelEnded.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelDuration
@@ -303,7 +303,7 @@ sealed partial class StreamHistoryForm
         labelDuration.Name = "labelDuration";
         labelDuration.Size = new Size(328, 24);
         labelDuration.TabIndex = 4;
-        labelDuration.Text = "⏱️ Длительность: —";
+        labelDuration.Text = "⏱️ Длительность: –";
         labelDuration.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelMessages
@@ -313,7 +313,7 @@ sealed partial class StreamHistoryForm
         labelMessages.Name = "labelMessages";
         labelMessages.Size = new Size(328, 24);
         labelMessages.TabIndex = 5;
-        labelMessages.Text = "💬 Сообщений: —";
+        labelMessages.Text = "💬 Сообщений: –";
         labelMessages.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelChatters
@@ -323,7 +323,7 @@ sealed partial class StreamHistoryForm
         labelChatters.Name = "labelChatters";
         labelChatters.Size = new Size(328, 24);
         labelChatters.TabIndex = 6;
-        labelChatters.Text = "👥 Чаттеров: —";
+        labelChatters.Text = "👥 Чаттеров: –";
         labelChatters.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelViewers
@@ -333,7 +333,7 @@ sealed partial class StreamHistoryForm
         labelViewers.Name = "labelViewers";
         labelViewers.Size = new Size(328, 24);
         labelViewers.TabIndex = 7;
-        labelViewers.Text = "👁 Зрители: пик — / средн. —";
+        labelViewers.Text = "👁 Зрители: пик – / средн. –";
         labelViewers.TextAlign = ContentAlignment.MiddleLeft;
         //
         // labelSegmentsHeader
